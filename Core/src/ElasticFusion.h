@@ -36,6 +36,13 @@
 #include <iomanip>
 #include <pangolin/gl/glcuda.h>
 
+// uncomment to enable benchmarking
+//#define BENCHMARKEF
+
+#ifdef BENCHMARKEF
+#include <chrono>
+#endif /* BENCHMARKEF */
+
 class ElasticFusion
 {
     public:
@@ -253,6 +260,13 @@ class ElasticFusion
          * @param maxVal maximum depth value to render
          */
         void normaliseDepth(const float & minVal, const float & maxVal);
+
+#ifdef BENCHMARKEF
+        std::chrono::duration<double, std::milli> odomDuration;
+        std::chrono::duration<double, std::milli> localClosureDuration;
+        std::chrono::duration<double, std::milli> globalClosureDuration;
+        std::chrono::duration<double, std::milli> fusionDuration;
+#endif
 
         //Here be dragons
     private:

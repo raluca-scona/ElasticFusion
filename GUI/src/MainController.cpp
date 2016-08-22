@@ -28,6 +28,9 @@ MainController::MainController(int argc, char * argv[])
    resetButton(false),
    resizeStream(0)
 {
+#ifdef BENCHMARKCTRL
+    out.open("/home/raluca/ef-times.txt");
+#endif
     std::string empty;
     iclnuim = Parse::get().arg(argc, argv, "-icl", empty) > -1;
 
@@ -211,6 +214,11 @@ void MainController::run()
 {
     while(!pangolin::ShouldQuit() && !((!logReader->hasMore()) && quiet) && !(eFusion->getTick() == end && quiet))
     {
+#ifdef BENCHMARKCTRL
+        std::chrono::high_resolution_clock::time_point mainControllerT0  = std::chrono::high_resolution_clock::now();
+#endif
+
+        TICK("MainControllerLoop");
         if(!gui->pause->Get() || pangolin::Pushed(*gui->step))
         {
             if((logReader->hasMore() || rewind) && eFusion->getTick() < end)
@@ -262,8 +270,15 @@ void MainController::run()
                     *currentPose = groundTruthOdometry->getTransformation(logReader->timestamp);
                 }
 
+#ifdef BENCHMARKCTRL
+                std::chrono::high_resolution_clock::time_point processFrameT0  = std::chrono::high_resolution_clock::now();
+#endif
                 eFusion->processFrame(logReader->rgb, logReader->depth, logReader->timestamp, currentPose, weightMultiplier);
 
+#ifdef BENCHMARKCTRL
+                std::chrono::high_resolution_clock::time_point processFrameT1  = std::chrono::high_resolution_clock::now();
+                processFrameDuration = processFrameT1 - processFrameT0;
+#endif
                 if(currentPose)
                 {
                     delete currentPose;
@@ -281,6 +296,9 @@ void MainController::run()
         }
 
         TICK("GUI");
+#ifdef BENCHMARKCTRL
+        std::chrono::high_resolution_clock::time_point guiT0  = std::chrono::high_resolution_clock::now();
+#endif
 
         if(gui->followPose->Get())
         {
@@ -551,5 +569,38 @@ void MainController::run()
         }
 
         TOCK("GUI");
+#ifdef BENCHMARKCTRL
+        std::chrono::high_resolution_clock::time_point guiT1  = std::chrono::high_resolution_clock::now();
+        std::chrono::high_resolution_clock::time_point mainControllerT1  = std::chrono::high_resolution_clock::now();
+
+        guiDuration = guiT1 - guiT0;
+        mainControllerDuration = mainControllerT1 - mainControllerT0;
+
+        currLastCount = eFusion->getGlobalModel().lastCount();
+        currLocalDeforms = eFusion->getDeforms();
+        currGlobalDeforms = eFusion->getFernDeforms();
+
+        out << eFusion->getTick() <<" "
+            << eFusion->getGlobalModel().lastCount()<<" "
+            << currLastCount - prevLastCount<<" "
+            << currLocalDeforms - prevLocalDeforms<<" "
+            << currGlobalDeforms - prevGlobalDeforms<<" "
+            << processFrameDuration.count()<<" "
+            << guiDuration.count()<<" "
+            << mainControllerDuration.count()<<" "
+            << eFusion->odomDuration.count()<<" "
+            << eFusion->localClosureDuration.count()<<" "
+            << eFusion->globalClosureDuration.count()<<" "
+            << eFusion->fusionDuration.count()<<"\n";
+
+        prevLastCount = currLastCount;
+        prevLocalDeforms = currLocalDeforms;
+        prevGlobalDeforms = currGlobalDeforms;
+#endif
+
+        TOCK("MainControllerLoop");
     }
+#ifdef BENCHMARKCTRL
+    out.close();
+#endif
 }

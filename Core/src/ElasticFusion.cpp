@@ -56,7 +56,7 @@ ElasticFusion::ElasticFusion(const int timeDelta,
    covThresh(covThresh),
    deforms(0),
    fernDeforms(0),
-   consSample(20),
+   consSample(32),
    resize(Resolution::getInstance().width(),
           Resolution::getInstance().height(),
           Resolution::getInstance().width() / consSample,
@@ -97,10 +97,8 @@ ElasticFusion::ElasticFusion(const int timeDelta,
 
 ElasticFusion::~ElasticFusion()
 {
-    if(iclnuim)
-    {
-        savePly();
-    }
+
+    savePly();
 
     //Output deformed pose graph
     std::string fname = saveFilename;
@@ -315,6 +313,11 @@ void ElasticFusion::processFrame(const unsigned char * rgb,
             Eigen::Matrix<float, 3, 3, Eigen::RowMajor> rot = currPose.topLeftCorner(3, 3);
 
             TICK("odom");
+
+#ifdef BENCHMARKEF
+            std::chrono::high_resolution_clock::time_point odomT0  = std::chrono::high_resolution_clock::now();
+#endif
+
             frameToModel.getIncrementalTransformation(trans,
                                                       rot,
                                                       rgbOnly,
@@ -323,6 +326,11 @@ void ElasticFusion::processFrame(const unsigned char * rgb,
                                                       fastOdom,
                                                       so3);
             TOCK("odom");
+
+#ifdef BENCHMARKEF
+            std::chrono::high_resolution_clock::time_point odomT1  = std::chrono::high_resolution_clock::now();
+            odomDuration = odomT1 - odomT0;
+#endif
 
             trackingOk = !reloc || frameToModel.lastICPError < 1e-04;
 
@@ -383,7 +391,9 @@ void ElasticFusion::processFrame(const unsigned char * rgb,
         }
         else
         {
-            currPose = *inPose;
+            //currPose = *inPose;
+            //for odometry:
+            currPose = currPose * (*inPose);
         }
 
         Eigen::Matrix4f diff = currPose.inverse() * lastPose;
@@ -410,10 +420,18 @@ void ElasticFusion::processFrame(const unsigned char * rgb,
 
         Eigen::Matrix4f recoveryPose = currPose;
 
+#ifdef BENCHMARKEF
+        std::chrono::high_resolution_clock::time_point globalClosureT0  = std::chrono::high_resolution_clock::now();
+#endif
+
+        //Done with the tracking - attempting to close global loop closure using fern database
         if(closeLoops)
         {
             lastFrameRecovery = false;
 
+
+            //this adds constraints only if the registration is close enough -
+            //passing in here the texture produced by predict() - using active part of model
             TICK("Ferns::findFrame");
             recoveryPose = ferns.findFrame(constraints,
                                            currPose,
@@ -429,6 +447,8 @@ void ElasticFusion::processFrame(const unsigned char * rgb,
 
         bool fernAccepted = false;
 
+        //if I found a similar enough fern
+
         if(closeLoops && ferns.lastClosest != -1)
         {
             if(lost)
@@ -436,6 +456,8 @@ void ElasticFusion::processFrame(const unsigned char * rgb,
                 currPose = recoveryPose;
                 lastFrameRecovery = true;
             }
+
+            //if I am not lost, add the identified global constraints
             else
             {
                 for(size_t i = 0; i < constraints.size(); i++)
@@ -447,13 +469,17 @@ void ElasticFusion::processFrame(const unsigned char * rgb,
                                                     true);
                 }
 
+                //where to the relative constraints come from?
                 for(size_t i = 0; i < relativeCons.size(); i++)
                 {
                     globalDeformation.addConstraint(relativeCons.at(i));
                 }
 
+                //Applying the deformation graph?
                 if(globalDeformation.constrain(ferns.frames, rawGraph, tick, true, poseGraph, true))
                 {
+
+                    std::cout<<"deforming the graph now - global\n";
                     currPose = recoveryPose;
 
                     poseMatches.push_back(PoseMatch(ferns.lastClosest, ferns.frames.size(), ferns.frames.at(ferns.lastClosest)->pose, currPose, constraints, true));
@@ -464,11 +490,22 @@ void ElasticFusion::processFrame(const unsigned char * rgb,
                 }
             }
         }
+#ifdef BENCHMARKEF
+        std::chrono::high_resolution_clock::time_point globalClosureT1  = std::chrono::high_resolution_clock::now();
+        globalClosureDuration = globalClosureT1 - globalClosureT0;
+#endif
 
+#ifdef BENCHMARKEF
+        std::chrono::high_resolution_clock::time_point localClosureT0  = std::chrono::high_resolution_clock::now();
+#endif
         //If we didn't match to a fern
         if(!lost && closeLoops && rawGraph.size() == 0)
         {
             //Only predict old view, since we just predicted the current view for the ferns (which failed!)
+
+            //Using the inactive view of the IndexMap
+
+            //Trying to register active model into inactive
             TICK("IndexMap::INACTIVE");
             indexMap.combinedPredict(currPose,
                                      globalModel.model(),
@@ -515,6 +552,7 @@ void ElasticFusion::processFrame(const unsigned char * rgb,
             estPose.topRightCorner(3, 1) = trans;
             estPose.topLeftCorner(3, 3) = rot;
 
+            //if registration was ok, add local deformation constraints
             if(covOk && modelToModel.lastICPCount > icpCountThresh && modelToModel.lastICPError < icpErrThresh)
             {
                 resize.vertex(indexMap.vertexTex(), consBuff);
@@ -553,6 +591,8 @@ void ElasticFusion::processFrame(const unsigned char * rgb,
 
                 if(localDeformation.constrain(ferns.frames, rawGraph, tick, false, poseGraph, false, &newRelativeCons))
                 {
+                    std::cout<<"deforming the graph now - local\n";
+
                     poseMatches.push_back(PoseMatch(ferns.frames.size() - 1, ferns.frames.size(), estPose, currPose, constraints, false));
 
                     deforms += rawGraph.size() > 0;
@@ -566,6 +606,17 @@ void ElasticFusion::processFrame(const unsigned char * rgb,
                 }
             }
         }
+#ifdef BENCHMARKEF
+        std::chrono::high_resolution_clock::time_point localClosureT1  = std::chrono::high_resolution_clock::now();
+        localClosureDuration = localClosureT1 - localClosureT0;
+#endif
+
+
+        //rgbOnly does only tracking (no fusion) - this loop means - if I also want fusion, tracking is ok and i am not lost
+        //this bit of the code does the fusion
+#ifdef BENCHMARKEF
+        std::chrono::high_resolution_clock::time_point fusionT0  = std::chrono::high_resolution_clock::now();
+#endif
 
         if(!rgbOnly && trackingOk && !lost)
         {
@@ -617,6 +668,11 @@ void ElasticFusion::processFrame(const unsigned char * rgb,
                               maxDepthProcessed,
                               fernAccepted);
         }
+#ifdef BENCHMARKEF
+        std::chrono::high_resolution_clock::time_point fusionT1  = std::chrono::high_resolution_clock::now();
+        fusionDuration = fusionT1 - fusionT0;
+#endif
+
     }
 
     poseGraph.push_back(std::pair<unsigned long long int, Eigen::Matrix4f>(tick, currPose));

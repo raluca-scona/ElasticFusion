@@ -35,7 +35,7 @@ float getRadius(float depth, float norm_z)
 
 float confidence(float x, float y, float weighting)
 {
-    const float maxRadDist = 400; //sqrt((width * 0.5)^2 + (height * 0.5)^2)
+    const float maxRadDist = 724; //400; //sqrt((width * 0.5)^2 + (height * 0.5)^2)
     const float twoSigmaSquared = 0.72; //2*(0.6^2) from paper
     
     vec2 pixelPosCentered = vec2(x, y) - cam.xy;

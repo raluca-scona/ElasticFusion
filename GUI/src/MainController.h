@@ -16,6 +16,9 @@
  *
  */
 
+#ifndef MAINCONTROLLER_H_
+#define MAINCONTROLLER_H_
+
 #include <ElasticFusion.h>
 #include <Utils/Parse.h>
 
@@ -24,8 +27,14 @@
 #include "Tools/RawLogReader.h"
 #include "Tools/LiveLogReader.h"
 
-#ifndef MAINCONTROLLER_H_
-#define MAINCONTROLLER_H_
+// uncomment to enable benchmarking
+//#define BENCHMARKCTRL
+
+#ifdef BENCHMARKCTRL
+#include <chrono>
+#include <iostream>
+#include <fstream>
+#endif
 
 class MainController
 {
@@ -78,6 +87,23 @@ class MainController
         bool resetButton;
 
         Resize * resizeStream;
+
+#ifdef BENCHMARKCTRL
+        std::ofstream out;
+
+        std::chrono::duration<double, std::milli> processFrameDuration;
+        std::chrono::duration<double, std::milli> guiDuration;
+        std::chrono::duration<double, std::milli> mainControllerDuration;
+
+        int prevLastCount = 0;
+        int currLastCount = 0;
+
+        int prevLocalDeforms = 0;
+        int currLocalDeforms = 0;
+
+        int prevGlobalDeforms = 0;
+        int currGlobalDeforms = 0;
+#endif /* BENCHMARKCTRL */
 };
 
 #endif /* MAINCONTROLLER_H_ */
