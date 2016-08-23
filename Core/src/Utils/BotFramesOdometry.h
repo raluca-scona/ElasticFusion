@@ -9,12 +9,11 @@
 class BotFramesOdometry
 {
     public:
-        BotFramesOdometry(BotFrames * botframes_, std::string cameraFrame);
+        BotFramesOdometry(BotFrames * botframes_, std::string cameraFrame, std::string worldFrame);
 
         virtual ~BotFramesOdometry();
 
-        void getIncrementalTransformation(Eigen::Vector3f & trans,
-                                          Eigen::Matrix<float, 3, 3, Eigen::RowMajor> & rot,
+        void getIncrementalTransformation(Eigen::Matrix4f & deltaMotion,
                                           uint64_t timestamp);
         Eigen::MatrixXd getCovariance();
 
@@ -22,9 +21,11 @@ class BotFramesOdometry
 
     private:
         BotFrames* botFrames;
-        Eigen::Isometry3f prevPosition; // world position of the camera at the previous iteration
+        Eigen::Isometry3f currPosition = Eigen::Isometry3f::Identity();
+        Eigen::Isometry3f prevPosition = Eigen::Isometry3f::Identity();
         std::string cameraFrame;
-        bool isInitialised; // has prevPosition been initialized?
+        std::string worldFrame;
+        bool isInitialised = false; // has prevPosition been initialized?
 };
 
 #endif /* BOTFRAMESODOMETRY_H_ */

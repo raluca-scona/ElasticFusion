@@ -1,22 +1,22 @@
 #include "BotFramesOdometry.h"
 
-BotFramesOdometry::BotFramesOdometry(BotFrames* botframes_, std::string lcmChannel)
+BotFramesOdometry::BotFramesOdometry(BotFrames* botframes_, std::string cameraFrame, std::string worldFrame)
  : botFrames(botframes_),
    prevPosition(Eigen::Isometry3f::Identity()),
-   cameraFrame(lcmChannel),
+   cameraFrame(cameraFrame),
+   worldFrame(worldFrame),
    isInitialised(false) {}
 
 BotFramesOdometry::~BotFramesOdometry()
 {
 }
 
-void BotFramesOdometry::getIncrementalTransformation(Eigen::Vector3f & trans,
-                                                     Eigen::Matrix<float, 3, 3, Eigen::RowMajor> & rot,
+void BotFramesOdometry::getIncrementalTransformation(Eigen::Matrix4f & deltaMotion,
                                                      uint64_t timestamp
                                                      )
 {
     double curr_position_array[16];
-    int status = bot_frames_get_trans_mat_4x4_with_utime(botFrames, cameraFrame.c_str(),  "local", timestamp, curr_position_array);
+    int status = bot_frames_get_trans_mat_4x4_with_utime(botFrames, cameraFrame.c_str(),  worldFrame.c_str(), timestamp, curr_position_array);
 
     if (!status)
     {
@@ -24,24 +24,24 @@ void BotFramesOdometry::getIncrementalTransformation(Eigen::Vector3f & trans,
         return;
     }
 
-    Eigen::Isometry3f currPosition;
-
     for (int i = 0; i < 4; ++i) {
         for (int j = 0; j < 4; ++j) {
             currPosition(i,j) = float(curr_position_array[i*4+j]);
         }
     }
 
-    if (!isInitialised) {
+    /*
+     * this is necessary if we want to integrate delta. otherwise result is in global coordinate frames
+     * if (!isInitialised) {
         prevPosition = currPosition;
         isInitialised = true;
         return;
-    }
+    }*/
 
-    Eigen::Isometry3f deltaMotion = prevPosition.inverse() * currPosition;
+    Eigen::Isometry3f motion = prevPosition.inverse() * currPosition;
 
-    trans = deltaMotion.translation();
-    rot = deltaMotion.rotation();
+    deltaMotion.topRightCorner(3,1) = motion.translation();
+    deltaMotion.topLeftCorner(3,3)  = motion.rotation();
 
     prevPosition = currPosition;
 }

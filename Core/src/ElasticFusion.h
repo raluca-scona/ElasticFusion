@@ -68,6 +68,7 @@ class ElasticFusion
 
         ElasticFusion(BotFrames * botFrames,
                       std::string cameraFrame = "CAMERA_LEFT",
+                      std::string worldFrame = "local",
                       const int timeDelta = 200,
                       const int countThresh = 35000,
                       const float errThresh = 5e-05,
@@ -363,6 +364,7 @@ class ElasticFusion
         bool so3;
         bool frameToFrameRGB;
         float depthCutoff;
+        bool useBotFramesOdometry = false;
 };
 
 #endif /* ELASTICFUSION_H_ */

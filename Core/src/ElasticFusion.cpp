@@ -97,6 +97,7 @@ ElasticFusion::ElasticFusion(const int timeDelta,
 
 ElasticFusion::ElasticFusion(BotFrames * botFrames,
                              std::string cameraFrame,
+                             std::string worldFrame,
                              const int timeDelta,
                              const int countThresh,
                              const float errThresh,
@@ -131,7 +132,8 @@ ElasticFusion::ElasticFusion(BotFrames * botFrames,
                     fileName)
  {
     botFrames = botFrames;
-    botFramesOdometry = new BotFramesOdometry(botFrames, cameraFrame);
+    botFramesOdometry = new BotFramesOdometry(botFrames, cameraFrame, worldFrame);
+    useBotFramesOdometry = true;
 }
 
 
@@ -326,7 +328,7 @@ void ElasticFusion::processFrame(const unsigned char * rgb,
 
         bool trackingOk = true;
 
-        if(bootstrap || !inPose)
+        if( (bootstrap || !inPose) && !useBotFramesOdometry)
         {
             TICK("autoFill");
             resize.image(indexMap.imageTex(), imageBuff);
@@ -430,11 +432,16 @@ void ElasticFusion::processFrame(const unsigned char * rgb,
             currPose.topRightCorner(3, 1) = trans;
             currPose.topLeftCorner(3, 3) = rot;
         }
-        else
-        {
-            //currPose = *inPose;
-            //for odometry:
-            currPose = currPose * (*inPose);
+        else if (useBotFramesOdometry) {
+
+            Eigen::Matrix4f deltaMotion = Eigen::Matrix4f::Identity();
+
+            botFramesOdometry->getIncrementalTransformation(deltaMotion, timestamp);
+
+            currPose = currPose * deltaMotion;
+
+        } else {
+            currPose = *inPose;
         }
 
         Eigen::Matrix4f diff = currPose.inverse() * lastPose;
