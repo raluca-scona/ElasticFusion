@@ -95,6 +95,47 @@ ElasticFusion::ElasticFusion(const int timeDelta,
     Stopwatch::getInstance().setCustomSignature(12431231);
 }
 
+ElasticFusion::ElasticFusion(BotFrames * botFrames,
+                             std::string cameraFrame,
+                             const int timeDelta,
+                             const int countThresh,
+                             const float errThresh,
+                             const float covThresh,
+                             const bool closeLoops,
+                             const bool iclnuim,
+                             const bool reloc,
+                             const float photoThresh,
+                             const float confidence,
+                             const float depthCut,
+                             const float icpThresh,
+                             const bool fastOdom,
+                             const float fernThresh,
+                             const bool so3,
+                             const bool frameToFrameRGB,
+                             const std::string fileName)
+    : ElasticFusion(timeDelta,
+                    countThresh,
+                    errThresh,
+                    covThresh,
+                    closeLoops,
+                    iclnuim,
+                    reloc,
+                    photoThresh,
+                    confidence,
+                    depthCut,
+                    icpThresh,
+                    fastOdom,
+                    fernThresh,
+                    so3,
+                    frameToFrameRGB,
+                    fileName)
+ {
+    botFrames = botFrames;
+    botFramesOdometry = new BotFramesOdometry(botFrames, cameraFrame);
+}
+
+
+
 ElasticFusion::~ElasticFusion()
 {
 

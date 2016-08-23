@@ -3,10 +3,12 @@ cmake_minimum_required(VERSION 2.6.0)
 project(libefusion)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}")
-
+find_package(PkgConfig REQUIRED)
 find_package(Pangolin 0.1 REQUIRED)
 find_package(CUDA REQUIRED)
 find_package(SuiteSparse REQUIRED)
+
+pkg_search_module(bot2-frames REQUIRED bot2-frames)
 
 set(efusion_SHADER_DIR "${CMAKE_CURRENT_SOURCE_DIR}/Shaders" CACHE PATH "Where the shaders live")
 
@@ -14,6 +16,7 @@ include_directories(${Pangolin_INCLUDE_DIRS})
 include_directories(${CUDA_INCLUDE_DIRS})
 include_directories(${EIGEN_INCLUDE_DIRS})
 include_directories(${SUITESPARSE_INCLUDE_DIRS})
+include_directories(${bot2-frames_INCLUDE_DIRS})
 
 file(GLOB srcs *.cpp)
 file(GLOB utils_srcs Utils/*.cpp)
@@ -36,6 +39,10 @@ CUDA_COMPILE(cuda_objs ${cuda})
 set(CMAKE_CXX_FLAGS "-O3 -msse2 -msse3 -Wall -std=c++11 -DSHADER_DIR=${efusion_SHADER_DIR}")
 #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -Wall -std=c++11 -DSHADER_DIR=${efusion_SHADER_DIR}")
 
+link_directories(
+${bot2-frames_LIBRARY_DIRS}
+)
+
 add_library(efusion SHARED 
             ${srcs}
             ${utils_srcs}
@@ -50,4 +57,5 @@ target_link_libraries(efusion
                       ${Pangolin_LIBRARIES}
                       ${CUDA_LIBRARIES}
                       ${SUITESPARSE_LIBRARIES}
+                      ${bot2-frames_LIBRARIES}
 )
