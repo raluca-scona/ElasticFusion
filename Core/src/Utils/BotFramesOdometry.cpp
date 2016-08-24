@@ -4,16 +4,31 @@ BotFramesOdometry::BotFramesOdometry(BotFrames* botframes_, std::string cameraFr
  : botFrames(botframes_),
    prevPosition(Eigen::Isometry3f::Identity()),
    cameraFrame(cameraFrame),
-   worldFrame(worldFrame),
-   isInitialised(false) {}
+   worldFrame(worldFrame) {}
 
 BotFramesOdometry::~BotFramesOdometry()
 {
 }
 
-void BotFramesOdometry::getIncrementalTransformation(Eigen::Matrix4f & deltaMotion,
-                                                     uint64_t timestamp
-                                                     )
+void BotFramesOdometry::initialisePose(Eigen::Matrix4f & pose, uint64_t timestamp) {
+    double curr_position_array[16];
+    int status = bot_frames_get_trans_mat_4x4_with_utime(botFrames, cameraFrame.c_str(),  worldFrame.c_str(), timestamp, curr_position_array);
+
+    if (!status)
+    {
+        std::cout << "BotFramesOdometry: bot_frames returned false";
+        return;
+    }
+
+    for (int i = 0; i < 4; ++i) {
+        for (int j = 0; j < 4; ++j) {
+            prevPosition(i,j) = float(curr_position_array[i*4+j]);
+            pose(i,j) = float(curr_position_array[i*4+j]);
+        }
+    }
+}
+
+void BotFramesOdometry::getIncrementalTransformation(Eigen::Matrix4f & deltaMotion, uint64_t timestamp)
 {
     double curr_position_array[16];
     int status = bot_frames_get_trans_mat_4x4_with_utime(botFrames, cameraFrame.c_str(),  worldFrame.c_str(), timestamp, curr_position_array);
@@ -29,14 +44,6 @@ void BotFramesOdometry::getIncrementalTransformation(Eigen::Matrix4f & deltaMoti
             currPosition(i,j) = float(curr_position_array[i*4+j]);
         }
     }
-
-    /*
-     * this is necessary if we want to integrate delta. otherwise result is in global coordinate frames
-     * if (!isInitialised) {
-        prevPosition = currPosition;
-        isInitialised = true;
-        return;
-    }*/
 
     Eigen::Isometry3f motion = prevPosition.inverse() * currPosition;
 
@@ -62,5 +69,4 @@ Eigen::MatrixXd BotFramesOdometry::getCovariance()
 
 void BotFramesOdometry::reset() {
     prevPosition = Eigen::Isometry3f::Identity();
-    isInitialised  = false;
 }

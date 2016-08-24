@@ -316,6 +316,8 @@ void ElasticFusion::processFrame(const unsigned char * rgb,
     //First run
     if(tick == 1)
     {
+        botFramesOdometry->initialisePose(currPose, timestamp);
+
         computeFeedbackBuffers();
 
         globalModel.initialise(*feedbackBuffers[FeedbackBuffer::RAW], *feedbackBuffers[FeedbackBuffer::FILTERED]);

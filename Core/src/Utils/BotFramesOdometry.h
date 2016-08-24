@@ -13,6 +13,8 @@ class BotFramesOdometry
 
         virtual ~BotFramesOdometry();
 
+        void initialisePose(Eigen::Matrix4f & pose, uint64_t timestamp);
+
         void getIncrementalTransformation(Eigen::Matrix4f & deltaMotion,
                                           uint64_t timestamp);
         Eigen::MatrixXd getCovariance();
@@ -25,7 +27,6 @@ class BotFramesOdometry
         Eigen::Isometry3f prevPosition = Eigen::Isometry3f::Identity();
         std::string cameraFrame;
         std::string worldFrame;
-        bool isInitialised = false; // has prevPosition been initialized?
 };
 
 #endif /* BOTFRAMESODOMETRY_H_ */
