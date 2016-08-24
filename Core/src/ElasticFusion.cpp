@@ -85,12 +85,12 @@ ElasticFusion::ElasticFusion(const int timeDelta,
     createCompute();
     createFeedbackBuffers();
 
-    std::string filename = fileName;
+    /*std::string filename = fileName;
     filename.append(".freiburg");
 
     std::ofstream file;
     file.open(filename.c_str(), std::fstream::out);
-    file.close();
+    file.close(); */
 
     Stopwatch::getInstance().setCustomSignature(12431231);
 }
@@ -141,39 +141,7 @@ ElasticFusion::ElasticFusion(BotFrames * botFrames,
 ElasticFusion::~ElasticFusion()
 {
 
-    savePly();
-
-    //Output deformed pose graph
-    std::string fname = saveFilename;
-    fname.append(".freiburg");
-
-    std::ofstream f;
-    f.open(fname.c_str(), std::fstream::out);
-
-    for(size_t i = 0; i < poseGraph.size(); i++)
-    {
-        std::stringstream strs;
-
-        if(iclnuim)
-        {
-            strs << std::setprecision(6) << std::fixed << (double)poseLogTimes.at(i) << " ";
-        }
-        else
-        {
-            strs << std::setprecision(6) << std::fixed << (double)poseLogTimes.at(i) / 1000000.0 << " ";
-        }
-
-        Eigen::Vector3f trans = poseGraph.at(i).second.topRightCorner(3, 1);
-        Eigen::Matrix3f rot = poseGraph.at(i).second.topLeftCorner(3, 3);
-
-        f << strs.str() << trans(0) << " " << trans(1) << " " << trans(2) << " ";
-
-        Eigen::Quaternionf currentCameraRotation(rot);
-
-        f << currentCameraRotation.x() << " " << currentCameraRotation.y() << " " << currentCameraRotation.z() << " " << currentCameraRotation.w() << "\n";
-    }
-
-    f.close();
+    savePlyAndTrajectory();
 
     for(std::map<std::string, GPUTexture*>::iterator it = textures.begin(); it != textures.end(); ++it)
     {
@@ -821,9 +789,25 @@ void ElasticFusion::normaliseDepth(const float & minVal, const float & maxVal)
     computePacks[ComputePack::NORM]->compute(textures[GPUTexture::DEPTH_RAW]->texture, &uniforms);
 }
 
-void ElasticFusion::savePly()
+void ElasticFusion::savePlyAndTrajectory()
 {
     std::string filename = saveFilename;
+
+    time_t rawTime;
+    struct tm * timeInfo;
+    char buffer[80];
+
+    time (&rawTime);
+    timeInfo = localtime(&rawTime);
+
+    strftime(buffer,80,"-%d-%m-%Y-%I-%M-%S",timeInfo);
+    std::string timeString(buffer);
+
+    if (filename.empty()) {
+        filename.append("ef-map");
+    }
+
+    filename.append(timeString);
     filename.append(".ply");
 
     // Open file
@@ -921,6 +905,47 @@ void ElasticFusion::savePly()
     fs.close ();
 
     delete [] mapData;
+
+
+    //Output deformed pose graph
+    std::string fname = saveFilename;
+
+    if (fname.empty()) {
+        fname.append("ef-trajectory");
+    }
+
+    fname.append(timeString);
+
+    fname.append(".txt");
+
+    std::ofstream f;
+    f.open(fname.c_str(), std::fstream::out);
+
+    for(size_t i = 0; i < poseGraph.size(); i++)
+    {
+        std::stringstream strs;
+
+        if(iclnuim)
+        {
+            strs << std::setprecision(6) << std::fixed << (double)poseLogTimes.at(i) << " ";
+        }
+        else
+        {
+            strs << std::setprecision(6) << std::fixed << (double)poseLogTimes.at(i) / 1000000.0 << " ";
+        }
+
+        Eigen::Vector3f trans = poseGraph.at(i).second.topRightCorner(3, 1);
+        Eigen::Matrix3f rot = poseGraph.at(i).second.topLeftCorner(3, 3);
+
+        f << strs.str() << trans(0) << " " << trans(1) << " " << trans(2) << " ";
+
+        Eigen::Quaternionf currentCameraRotation(rot);
+
+        f << currentCameraRotation.x() << " " << currentCameraRotation.y() << " " << currentCameraRotation.z() << " " << currentCameraRotation.w() << "\n";
+    }
+
+    f.close();
+
 }
 
 Eigen::Vector3f ElasticFusion::rodrigues2(const Eigen::Matrix3f& matrix)

@@ -38,6 +38,7 @@
 
 #include <iomanip>
 #include <pangolin/gl/glcuda.h>
+#include <ctime>
 
 // uncomment to enable benchmarking
 //#define BENCHMARKEF
@@ -274,7 +275,7 @@ class ElasticFusion
         /**
          * Saves out a .ply mesh file of the current model
          */
-        void savePly();
+        void savePlyAndTrajectory();
 
         /**
          * Renders a normalised view of the input raw depth for displaying as an OpenGL texture
