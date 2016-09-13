@@ -9,7 +9,7 @@
 class BotFramesOdometry
 {
     public:
-        BotFramesOdometry(BotFrames * botframes_, std::string cameraFrame, std::string worldFrame);
+        BotFramesOdometry(BotFrames * botframes_, bool useVicon, std::string cameraFrame, std::string worldFrame, std::string pelvisFrame, std::string viconFrame);
 
         virtual ~BotFramesOdometry();
 
@@ -25,8 +25,11 @@ class BotFramesOdometry
         BotFrames* botFrames;
         Eigen::Isometry3f currPosition = Eigen::Isometry3f::Identity();
         Eigen::Isometry3f prevPosition = Eigen::Isometry3f::Identity();
+        bool useVicon;
         std::string cameraFrame;
         std::string worldFrame;
+        std::string pelvisFrame;
+        std::string viconFrame;
 };
 
 #endif /* BOTFRAMESODOMETRY_H_ */

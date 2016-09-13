@@ -98,6 +98,9 @@ ElasticFusion::ElasticFusion(const int timeDelta,
 ElasticFusion::ElasticFusion(BotFrames * botFrames,
                              std::string cameraFrame,
                              std::string worldFrame,
+                             bool useVicon,
+                             std::string pelvisFrame,
+                             std::string viconFrame,
                              const int timeDelta,
                              const int countThresh,
                              const float errThresh,
@@ -132,7 +135,7 @@ ElasticFusion::ElasticFusion(BotFrames * botFrames,
                     fileName)
  {
     botFrames = botFrames;
-    botFramesOdometry = new BotFramesOdometry(botFrames, cameraFrame, worldFrame);
+    botFramesOdometry = new BotFramesOdometry(botFrames, useVicon, cameraFrame, worldFrame, pelvisFrame, viconFrame);
     useBotFramesOdometry = true;
 }
 
