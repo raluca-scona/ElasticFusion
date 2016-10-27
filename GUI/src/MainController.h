@@ -28,7 +28,7 @@
 #include "Tools/LiveLogReader.h"
 
 // uncomment to enable benchmarking
-//#define BENCHMARKCTRL
+#define BENCHMARKCTRL
 
 #ifdef BENCHMARKCTRL
 #include <chrono>

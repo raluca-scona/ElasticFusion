@@ -136,7 +136,7 @@ ElasticFusion::ElasticFusion(BotFrames * botFrames,
  {
     botFrames = botFrames;
     botFramesOdometry = new BotFramesOdometry(botFrames, useVicon, cameraFrame, worldFrame, pelvisFrame, viconFrame);
-    useBotFramesOdometry = true;
+    useBotFramesOdometry = false;
 }
 
 
@@ -349,6 +349,12 @@ void ElasticFusion::processFrame(const unsigned char * rgb,
 #endif
 
             trackingOk = !reloc || frameToModel.lastICPError < 1e-04;
+
+            trackingICPError = frameToModel.lastICPError;
+            trackingICPCount = frameToModel.lastICPCount;
+
+            trackingRGBError = frameToModel.lastRGBError;
+            trackingRGBCount = frameToModel.lastRGBCount;
 
             if(reloc)
             {

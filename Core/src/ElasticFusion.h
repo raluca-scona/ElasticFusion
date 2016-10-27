@@ -41,7 +41,7 @@
 #include <ctime>
 
 // uncomment to enable benchmarking
-//#define BENCHMARKEF
+#define BENCHMARKEF
 
 #ifdef BENCHMARKEF
 #include <chrono>
@@ -293,6 +293,13 @@ class ElasticFusion
         std::chrono::duration<double, std::milli> localClosureDuration;
         std::chrono::duration<double, std::milli> globalClosureDuration;
         std::chrono::duration<double, std::milli> fusionDuration;
+
+        float trackingICPError = 0;
+        float trackingICPCount = 0;
+
+        float trackingRGBError = 0;
+        float trackingRGBCount = 0;
+
 #endif
 
         //Here be dragons

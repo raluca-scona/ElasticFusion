@@ -29,7 +29,7 @@ MainController::MainController(int argc, char * argv[])
    resizeStream(0)
 {
 #ifdef BENCHMARKCTRL
-    out.open("/home/raluca/ef-times.txt");
+    out.open("/home/raluca/ef-icp-rgb-errors.txt");
 #endif
     std::string empty;
     iclnuim = Parse::get().arg(argc, argv, "-icl", empty) > -1;
@@ -570,6 +570,7 @@ void MainController::run()
 
         TOCK("GUI");
 #ifdef BENCHMARKCTRL
+        std::cout<<"writing to file\n";
         std::chrono::high_resolution_clock::time_point guiT1  = std::chrono::high_resolution_clock::now();
         std::chrono::high_resolution_clock::time_point mainControllerT1  = std::chrono::high_resolution_clock::now();
 
