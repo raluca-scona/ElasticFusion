@@ -303,6 +303,7 @@ void ElasticFusion::processFrame(const unsigned char * rgb,
 
         if( (bootstrap || !inPose) && !useBotFramesOdometry)
         {
+
             TICK("autoFill");
             resize.image(indexMap.imageTex(), imageBuff);
             bool shouldFillIn = !denseEnough(imageBuff);
@@ -334,13 +335,18 @@ void ElasticFusion::processFrame(const unsigned char * rgb,
             std::chrono::high_resolution_clock::time_point odomT0  = std::chrono::high_resolution_clock::now();
 #endif
 
+
+            Eigen::Matrix4f deltaMotion = Eigen::Matrix4f::Identity();
+
+            botFramesOdometry->getIncrementalTransformation(deltaMotion, timestamp);
+
             frameToModel.getIncrementalTransformation(trans,
                                                       rot,
                                                       rgbOnly,
                                                       icpWeight,
                                                       pyramid,
                                                       fastOdom,
-                                                      so3);
+                                                      so3, deltaMotion);
             TOCK("odom");
 
 #ifdef BENCHMARKEF

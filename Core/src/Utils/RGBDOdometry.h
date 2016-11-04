@@ -60,6 +60,14 @@ class RGBDOdometry
                                           const bool & fastOdom,
                                           const bool & so3);
 
+        void getIncrementalTransformation(Eigen::Vector3f & trans,
+                                          Eigen::Matrix<float, 3, 3, Eigen::RowMajor> & rot,
+                                          const bool & rgbOnly,
+                                          const float & icpWeight,
+                                          const bool & pyramid,
+                                          const bool & fastOdom,
+                                          const bool & so3, Eigen::Matrix4f botFramesDelta);
+
         Eigen::MatrixXd getCovariance();
 
         float lastICPError;
