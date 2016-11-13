@@ -277,6 +277,7 @@ struct ICPReduction
     int rows;
     int N;
 
+    mutable PtrStep<float> icp_per_pixel_residual;
     JtJJtrSE3 * out;
 
     __device__ __forceinline__ bool
@@ -287,10 +288,14 @@ struct ICPReduction
         vcurr.y = vmap_curr.ptr (y + rows)[x];
         vcurr.z = vmap_curr.ptr (y + 2 * rows)[x];
 
+        //current vertex in global coordinates
         float3 vcurr_g = Rcurr * vcurr + tcurr;
+
+        //current vertex - projecting current point cloud in the coordinate system of the previous frame
         float3 vcurr_cp = Rprev_inv * (vcurr_g - tprev);
 
         int2 ukr;
+        //map point to pixel location
         ukr.x = __float2int_rn (vcurr_cp.x * intr.fx / vcurr_cp.z + intr.cx);
         ukr.y = __float2int_rn (vcurr_cp.y * intr.fy / vcurr_cp.z + intr.cy);
 
@@ -298,6 +303,7 @@ struct ICPReduction
             return false;
 
         float3 vprev_g;
+        //get point corresponding to pixel associated to curr point with delta applied
         vprev_g.x = __ldg(&vmap_g_prev.ptr (ukr.y       )[ukr.x]);
         vprev_g.y = __ldg(&vmap_g_prev.ptr (ukr.y + rows)[ukr.x]);
         vprev_g.z = __ldg(&vmap_g_prev.ptr (ukr.y + 2 * rows)[ukr.x]);
@@ -396,7 +402,12 @@ struct ICPReduction
 
         for(int i = blockIdx.x * blockDim.x + threadIdx.x; i < N; i += blockDim.x * gridDim.x)
         {
+
             JtJJtrSE3 val = getProducts(i);
+            // penultimate val holds residual for this point
+            int y = i / cols;
+            int x = i - (y * cols);
+            icp_per_pixel_residual.ptr (y)[x] = val.residual; //- this is correct
 
             sum.add(val);
         }
@@ -431,6 +442,7 @@ void icpStep(const mat33& Rcurr,
              float * matrixA_host,
              float * vectorB_host,
              float * residual_host,
+             DeviceArray2D<float> & icp_perpixel_residual,
              int threads,
              int blocks)
 {
@@ -462,6 +474,8 @@ void icpStep(const mat33& Rcurr,
     icp.N = cols * rows;
     icp.out = sum;
 
+    icp.icp_per_pixel_residual = icp_perpixel_residual;
+
     icpKernel<<<blocks, threads>>>(icp);
 
     reduceSum<<<1, MAX_THREADS>>>(sum, out, blocks);
@@ -471,6 +485,10 @@ void icpStep(const mat33& Rcurr,
 
     float host_data[32];
     out.download((JtJJtrSE3 *)&host_data[0]);
+
+   // float icp_res [vmap_curr.cols()] [vmap_curr.cols()];
+   // std::cout<<" " <<icp.icp_per_pixel_residual.elemSize();
+   // icp_perpixel_residual.download( &icp_res, vmap_curr.cols () * vmap_curr.cols ()  * 4 );
 
     int shift = 0;
     for (int i = 0; i < 6; ++i)

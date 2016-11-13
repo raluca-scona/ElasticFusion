@@ -77,6 +77,7 @@ void icpStep(const mat33& Rcurr,
              float * matrixA_host,
              float * vectorB_host,
              float * residual_host,
+             DeviceArray2D<float>& icp_perpixel_residual,
              int threads,
              int blocks);
 
