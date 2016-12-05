@@ -486,10 +486,6 @@ void icpStep(const mat33& Rcurr,
     float host_data[32];
     out.download((JtJJtrSE3 *)&host_data[0]);
 
-   // float icp_res [vmap_curr.cols()] [vmap_curr.cols()];
-   // std::cout<<" " <<icp.icp_per_pixel_residual.elemSize();
-   // icp_perpixel_residual.download( &icp_res, vmap_curr.cols () * vmap_curr.cols ()  * 4 );
-
     int shift = 0;
     for (int i = 0; i < 6; ++i)
     {

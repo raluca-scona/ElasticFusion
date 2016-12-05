@@ -68,7 +68,7 @@ class ElasticFusion
                       const std::string fileName = "");
 
         ElasticFusion(BotFrames * botFrames,
-                      std::string cameraFrame = "CAMERA_LEFT",
+                      std::string cameraFrame = "MULTISENSE_CAMERA_LEFT",
                       std::string worldFrame = "local",
                       bool useVicon = true,
                       std::string pelvisFrame = "body",

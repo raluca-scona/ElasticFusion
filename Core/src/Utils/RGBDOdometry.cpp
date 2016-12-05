@@ -618,6 +618,8 @@ void RGBDOdometry::getIncrementalTransformation(Eigen::Vector3f & trans,
                                                 const bool & fastOdom,
                                                 const bool & so3, Eigen::Matrix4f botFramesDelta)
 {
+
+
     bool icp = !rgbOnly && icpWeight > 0;
     bool rgb = rgbOnly || icpWeight < 100;
 
@@ -868,13 +870,29 @@ void RGBDOdometry::getIncrementalTransformation(Eigen::Vector3f & trans,
                 TOCK("icpStep");
             }
 
-          // std::cout<<vmap_curr.cols()<<" " <<sumDataSE3.size()<<"\n";
-          // std::cout<<icp_perpixel_residual.elem_step()<<" "<<icp_perpixel_residual.elem_size + 0<<"\n";
-          // icp_perpixel_residual.download(icp_res, 1);
-
-
             lastICPError = sqrt(residual[0]) / residual[1];
             lastICPCount = residual[1];
+
+
+            float icp_res [ vmap_curr.cols() * vmap_curr.cols()];
+           // Downloading per pixel cost matrix from ICP
+           // icp_perpixel_residual.download(&icp_res[0], icp_perpixel_residual.cols() * 4);
+
+            /*Checking that it is actually the same as the cummulated value
+             * float sum1 = 0.;
+            float sum2 = 0.;
+
+            for (int i=0; i<vmap_curr.cols(); i++) {
+                for (int j=0; j<vmap_curr.cols(); j++) {
+                    if (icp_res[ i * vmap_curr.cols() + j ] !=0) {
+                       // std::cout<<i<<" "<<j<<" "<<icp_res[ i * vmap_curr.cols() + j ]<<"\n";
+                        sum1 += icp_res[ i * vmap_curr.cols() + j ];
+                        sum2++;
+                    }
+                }
+            }
+
+            */
 
             Eigen::Matrix<float, 6, 6, Eigen::RowMajor> A_rgbd;
             Eigen::Matrix<float, 6, 1> b_rgbd;
@@ -922,45 +940,49 @@ void RGBDOdometry::getIncrementalTransformation(Eigen::Vector3f & trans,
             currRtVec(5, 0) = rtRot(2);
 
             Eigen::Matrix4f botInv = botFramesDelta.inverse();
-            Eigen::Vector3f botInvRot = OdometryProvider::rodrigues2(botInv.topLeftCorner(3,3));
+            Eigen::Vector3f botInvRotTwist = OdometryProvider::rodrigues2(botInv.topLeftCorner(3,3));
 
 
             botFramesVec(0, 0) = botInv(0, 3);
             botFramesVec(1, 0) = botInv(1, 3);
             botFramesVec(2, 0) = botInv(2, 3);
 
-            botFramesVec(3, 0) = botInvRot(0);
-            botFramesVec(4, 0) = botInvRot(1);
-            botFramesVec(5, 0) = botInvRot(2);
+            botFramesVec(3, 0) = botInvRotTwist(0);
+            botFramesVec(4, 0) = botInvRotTwist(1);
+            botFramesVec(5, 0) = botInvRotTwist(2);
 
+
+            /*  Approximate method - difference directly on twists */
             botFrames6DoFResidual = botFramesVec - currRtVec;
             Eigen::Matrix<double, 6, 6, Eigen::RowMajor> botFramesJac = Eigen::Matrix<double, 6,6, Eigen::RowMajor>::Identity();
+
+
+
 
             double numPixels = vmap_curr.cols() * vmap_curr.rows() / 3.0;
 
             float icpCountPercentage = lastICPCount * 100. / numPixels;
             float rgbCountPercentage = lastRGBCount * 100. / numPixels;
-            float botFramesCount = ( std::max(icpCountPercentage, rgbCountPercentage) + 0.) / 100. * numPixels  ;
+            float botFramesCount = ( std::max (std::max(icpCountPercentage, rgbCountPercentage) + 10. , 15.) ) / 100. * numPixels  ;
 
-            std::cout<<vmap_curr.cols()<<" "<<icpCountPercentage<<" "<<rgbCountPercentage<<"\n";
 
             Eigen::Matrix<double, 6, 6, Eigen::RowMajor> dA_bot = botFramesCount * botFramesJac.transpose() * botFramesJac;
             Eigen::Matrix<double, 6, 1> db_bot = botFramesCount * botFramesJac.transpose() * botFrames6DoFResidual;
 
-           /*std::cout<<" DA_RGBD \n"<< dA_rgbd <<"\n\n";
 
-            std::cout<<" DA_ICP \n"<< dA_icp <<"\n\n";
-
-            std::cout<<" DA_BOT \n"<< dA_bot <<"\n";
-           */
 
             if(icp && rgb)
             {
+
+
                 double w = icpWeight;
-                double wbot = 10.;
-                lastA =  dA_rgbd + w * w * dA_icp + wbot * wbot * dA_bot ;
+                double wbot = 100.;
+
+                lastA =  dA_rgbd + w * w * dA_icp + wbot *  dA_bot;
                 lastb =  db_rgbd + w * db_icp + wbot *  db_bot;
+
                 result = lastA.ldlt().solve(lastb);
+
             }
 
            /* if(icp && rgb)
@@ -990,7 +1012,6 @@ void RGBDOdometry::getIncrementalTransformation(Eigen::Vector3f & trans,
             Eigen::Isometry3f rgbOdom;
 
             OdometryProvider::computeUpdateSE3(resultRt, result, rgbOdom);
-
 
             Eigen::Isometry3f currentT;
             currentT.setIdentity();
