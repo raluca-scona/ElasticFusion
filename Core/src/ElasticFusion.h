@@ -21,6 +21,7 @@
 
 #include "Utils/RGBDOdometry.h"
 #include "Utils/BotFramesOdometry.h"
+#include "Utils/OdometryProvider.h"
 #include "Utils/Resolution.h"
 #include "Utils/Intrinsics.h"
 #include "Utils/Stopwatch.h"
@@ -333,8 +334,6 @@ class ElasticFusion
         bool denseEnough(const Img<Eigen::Matrix<unsigned char, 3, 1>> & img);
 
         void processFerns();
-
-        Eigen::Vector3f rodrigues2(const Eigen::Matrix3f& matrix);
 
         Eigen::Matrix4f currPose;
 
