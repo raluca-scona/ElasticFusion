@@ -616,9 +616,10 @@ void RGBDOdometry::getIncrementalTransformation(Eigen::Vector3f & trans,
                                                 const float & icpWeight,
                                                 const bool & pyramid,
                                                 const bool & fastOdom,
-                                                const bool & so3, Eigen::Matrix4f botFramesDelta)
+                                                const bool & so3,
+                                                Eigen::Matrix4f botFramesDelta,
+                                                std::vector<float> & icpResiduals)
 {
-
 
     bool icp = !rgbOnly && icpWeight > 0;
     bool rgb = rgbOnly || icpWeight < 100;
@@ -874,25 +875,14 @@ void RGBDOdometry::getIncrementalTransformation(Eigen::Vector3f & trans,
             lastICPCount = residual[1];
 
 
-            float icp_res [ vmap_curr.cols() * vmap_curr.cols()];
-           // Downloading per pixel cost matrix from ICP
-           // icp_perpixel_residual.download(&icp_res[0], icp_perpixel_residual.cols() * 4);
+            if (j == (iterations[i] - 1) && i == 0) {
+                float icpRes[ vmap_curr.cols() * vmap_curr.rows() /3];
 
-            /*Checking that it is actually the same as the cummulated value
-             * float sum1 = 0.;
-            float sum2 = 0.;
+                icp_perpixel_residual.download(&icpRes[0], icp_perpixel_residual.cols() * 4);
 
-            for (int i=0; i<vmap_curr.cols(); i++) {
-                for (int j=0; j<vmap_curr.cols(); j++) {
-                    if (icp_res[ i * vmap_curr.cols() + j ] !=0) {
-                       // std::cout<<i<<" "<<j<<" "<<icp_res[ i * vmap_curr.cols() + j ]<<"\n";
-                        sum1 += icp_res[ i * vmap_curr.cols() + j ];
-                        sum2++;
-                    }
-                }
+                std::copy(icpRes, icpRes + vmap_curr.cols() * vmap_curr.cols(), icpResiduals.begin());
             }
 
-            */
 
             Eigen::Matrix<float, 6, 6, Eigen::RowMajor> A_rgbd;
             Eigen::Matrix<float, 6, 1> b_rgbd;
@@ -940,7 +930,8 @@ void RGBDOdometry::getIncrementalTransformation(Eigen::Vector3f & trans,
             currRtVec(5, 0) = rtRot(2);
 
             Eigen::Matrix4f botInv = botFramesDelta.inverse();
-            Eigen::Vector3f botInvRotTwist = OdometryProvider::rodrigues2(botInv.topLeftCorner(3,3));
+            Eigen::Matrix3f botInvRot = botInv.topLeftCorner(3,3);
+            Eigen::Vector3f botInvRotTwist = OdometryProvider::rodrigues2(botInvRot);
 
 
             botFramesVec(0, 0) = botInv(0, 3);
@@ -951,13 +942,76 @@ void RGBDOdometry::getIncrementalTransformation(Eigen::Vector3f & trans,
             botFramesVec(4, 0) = botInvRotTwist(1);
             botFramesVec(5, 0) = botInvRotTwist(2);
 
-
-            /*  Approximate method - difference directly on twists */
+            /*  Approximate method - difference directly on twists
             botFrames6DoFResidual = botFramesVec - currRtVec;
             Eigen::Matrix<double, 6, 6, Eigen::RowMajor> botFramesJac = Eigen::Matrix<double, 6,6, Eigen::RowMajor>::Identity();
+            */
 
+            //using Lie Algebra representation for Rotations
+            Eigen::Matrix3f resultRtRot = resultRt.cast<float>().topLeftCorner(3,3);
+            Eigen::Vector3f rotResidual = OdometryProvider::rodrigues2(botInvRot * resultRtRot.inverse());
 
+            botFrames6DoFResidual(0, 0) = botFramesVec(0, 0) - currRtVec(0, 0);
+            botFrames6DoFResidual(1, 0) = botFramesVec(1, 0) - currRtVec(1, 0);
+            botFrames6DoFResidual(2, 0) = botFramesVec(2, 0) - currRtVec(2, 0);
+            botFrames6DoFResidual(3, 0) = !isnan(rotResidual(0, 0)) ? rotResidual(0, 0) : (botFramesVec(3, 0) - currRtVec(3, 0));
+            botFrames6DoFResidual(4, 0) = !isnan(rotResidual(1, 0)) ? rotResidual(1, 0) : (botFramesVec(4, 0) - currRtVec(4, 0));
+            botFrames6DoFResidual(5, 0) = !isnan(rotResidual(2, 0)) ? rotResidual(2, 0) : (botFramesVec(5, 0) - currRtVec(5, 0));
 
+            Eigen::Matrix<double, 6, 6, Eigen::RowMajor> botFramesJac = Eigen::Matrix<double, 6,6, Eigen::RowMajor>::Identity();
+            botFramesJac(0, 0) = -1;
+            botFramesJac(1, 1) = -1;
+            botFramesJac(2, 2) = -1;
+
+            //computing Jacobian
+            double r11, r12, r13, r21, r22, r23, r31, r32, r33;
+            r11 = botInvRot(0, 0);
+            r12 = botInvRot(0, 1);
+            r13 = botInvRot(0, 2);
+
+            r21 = botInvRot(1, 0);
+            r22 = botInvRot(1, 1);
+            r23 = botInvRot(1, 2);
+
+            r31 = botInvRot(2, 0);
+            r32 = botInvRot(2, 1);
+            r33 = botInvRot(2, 2);
+
+            double traceR = r11 + r22 + r33;
+
+            double d1dx = -0.5*(1.0*r22 + 1.0*r33)*pow((-1.0* pow((0.5*traceR - 0.5), 2) + 1.0),-0.5)*acos(0.5*traceR - 0.5) - (-1.0*r23 + r32)*(0.25*r23 - 0.25*r32)/( pow((0.5*traceR - 0.5), 2) - 1.0) - 0.5*(-1.0*r23 + r32)*(0.5*r23 - 0.5*r32)*(0.5*traceR - 0.5)*pow((-1.0* pow((0.5*traceR - 0.5), 2) + 1.0), -1.5)*acos(0.5*traceR - 0.5);
+
+            double d1dy = 0.5*r21*pow((-1.0*pow((0.5*traceR - 0.5),2) + 1.0), -0.5)*acos(0.5*traceR - 0.5) - (0.25*r13 - 0.25*r31)*(1.0*r23 - 1.0*r32)/( pow((0.5*traceR - 0.5),2) - 1.0) - 0.5*(0.5*r13 - 0.5*r31)*(1.0*r23 - 1.0*r32)*(0.5*traceR - 0.5)*pow((-1.0*pow((0.5*traceR - 0.5),2) + 1.0), -1.5)*acos(0.5*traceR - 0.5);
+
+            double d1dz = 0.5*r31* pow((-1.0* pow((0.5*traceR - 0.5),2) + 1.0), -0.5)*acos(0.5*traceR - 0.5) + (0.25*r12 - 0.25*r21)*(1.0*r23 - 1.0*r32)/( pow((0.5*traceR - 0.5),2) - 1.0) + 0.5*(0.5*r12 - 0.5*r21)*(1.0*r23 - 1.0*r32)*(0.5*traceR - 0.5)*pow((-1.0*pow((0.5*traceR - 0.5),2) + 1.0),-1.5)*acos(0.5*traceR - 0.5);
+
+            double d2dx = 0.5*r12*pow((-1.0*pow((0.5*traceR - 0.5),2) + 1.0), -0.5)*acos(0.5*traceR - 0.5) + (-1.0*r13 + 1.0*r31)*(0.25*r23 - 0.25*r32)/( pow((0.5*traceR - 0.5),2) - 1.0) + 0.5*(-1.0*r13 + 1.0*r31)*(0.5*r23 - 0.5*r32)*(0.5*traceR - 0.5)*pow((-1.0*pow((0.5*traceR - 0.5),2) + 1.0), -1.5)*acos(0.5*traceR - 0.5);
+
+            double d2dy = -0.5*(1.0*r11 + 1.0*r33)*pow((-1.0*pow((0.5*traceR - 0.5),2) + 1.0),-0.5)*acos(0.5*traceR - 0.5) + (0.25*r13 - 0.25*r31)*(1.0*r13 - 1.0*r31)/( pow((0.5*traceR - 0.5),2) - 1.0) + 0.5*(0.5*r13 - 0.5*r31)*(1.0*r13 - 1.0*r31)*(0.5*traceR - 0.5)*pow((-1.0*pow((0.5*traceR - 0.5),2) + 1.0), -1.5)*acos(0.5*traceR - 0.5);
+
+            double d2dz = 0.5*r32*pow((-1.0*pow((0.5*traceR - 0.5),2) + 1.0),-0.5)*acos(0.5*traceR - 0.5) - (0.25*r12 - 0.25*r21)*(1.0*r13 - 1.0*r31)/(pow((0.5*traceR - 0.5),2) - 1.0) - 0.5*(0.5*r12 - 0.5*r21)*(1.0*r13 - 1.0*r31)*(0.5*traceR - 0.5)*pow((-1.0*pow((0.5*traceR - 0.5),2) + 1.0),-1.5)*acos(0.5*traceR - 0.5);
+
+            double d3dx = 0.5*r13*pow((-1.0*pow((0.5*traceR - 0.5),2) + 1.0), -0.5)*acos(0.5*traceR - 0.5) + (1.0*r12 - 1.0*r21)*(0.25*r23 - 0.25*r32)/(pow((0.5*traceR - 0.5),2) - 1.0) + 0.5*(1.0*r12 - 1.0*r21)*(0.5*r23 - 0.5*r32)*(0.5*traceR - 0.5)*pow((-1.0*pow((0.5*traceR - 0.5),2) + 1.0), -1.5)*acos(0.5*traceR - 0.5);
+
+            double d3dy = 0.5*r23*pow((-1.0*pow((0.5*traceR - 0.5),2) + 1.0), -0.5)*acos(0.5*traceR - 0.5) + (-1.0*r12 + r21)*(0.25*r13 - 0.25*r31)/(pow((0.5*traceR - 0.5),2) - 1.0) + 0.5*(-1.0*r12 + r21)*(0.5*r13 - 0.5*r31)*(0.5*traceR - 0.5)*pow((-1.0*pow((0.5*traceR - 0.5),2) + 1.0), -1.5)*acos(0.5*traceR - 0.5);
+
+            double d3dz = -0.5*(1.0*r11 + 1.0*r22)*pow((-1.0*pow((0.5*traceR - 0.5),2) + 1.0),-0.5)*acos(0.5*traceR - 0.5) - (-1.0*r12 + r21)*(0.25*r12 - 0.25*r21)/(pow((0.5*traceR - 0.5),2) - 1.0) - 0.5*(-1.0*r12 + r21)*(0.5*r12 - 0.5*r21)*(0.5*traceR - 0.5)*pow((-1.0*pow((0.5*traceR - 0.5),2) + 1.0), -1.5)*acos(0.5*traceR - 0.5);
+
+            botFramesJac(0, 0) = -1;
+            botFramesJac(1, 1) = -1;
+            botFramesJac(2, 2) = -1;
+
+            botFramesJac(3, 3) = !isnan(d1dx) ? d1dx : -1;
+            botFramesJac(3, 4) = !isnan(d1dy) ? d1dy : 0;
+            botFramesJac(3, 5) = !isnan(d1dz) ? d1dz : 0;
+
+            botFramesJac(4, 3) = !isnan(d2dx) ? d2dx : 0;
+            botFramesJac(4, 4) = !isnan(d2dy) ? d2dy : -1;
+            botFramesJac(4, 5) = !isnan(d2dz) ? d2dz : 0;
+
+            botFramesJac(5, 3) = !isnan(d3dx) ? d3dx : 0;
+            botFramesJac(5, 4) = !isnan(d3dy) ? d3dy : 0;
+            botFramesJac(5, 5) = !isnan(d3dz) ? d3dz : -1;
 
             double numPixels = vmap_curr.cols() * vmap_curr.rows() / 3.0;
 
@@ -965,27 +1019,23 @@ void RGBDOdometry::getIncrementalTransformation(Eigen::Vector3f & trans,
             float rgbCountPercentage = lastRGBCount * 100. / numPixels;
             float botFramesCount = ( std::max (std::max(icpCountPercentage, rgbCountPercentage) + 10. , 15.) ) / 100. * numPixels  ;
 
-
             Eigen::Matrix<double, 6, 6, Eigen::RowMajor> dA_bot = botFramesCount * botFramesJac.transpose() * botFramesJac;
-            Eigen::Matrix<double, 6, 1> db_bot = botFramesCount * botFramesJac.transpose() * botFrames6DoFResidual;
-
+            Eigen::Matrix<double, 6, 1> db_bot = -1 * botFramesCount * botFramesJac.transpose() * botFrames6DoFResidual;
 
 
             if(icp && rgb)
             {
-
-
                 double w = icpWeight;
                 double wbot = 100.;
 
-                lastA =  dA_rgbd + w * w * dA_icp + wbot *  dA_bot;
-                lastb =  db_rgbd + w * db_icp + wbot *  db_bot;
+                lastA =  dA_rgbd + w * w * dA_icp + wbot * dA_bot;
+                lastb =  db_rgbd + w * db_icp + wbot * db_bot;
 
                 result = lastA.ldlt().solve(lastb);
-
             }
 
-           /* if(icp && rgb)
+            /*
+            if(icp && rgb)
             {
                 double w = icpWeight;
                 lastA =   dA_rgbd + w * w * dA_icp;

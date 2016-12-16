@@ -268,6 +268,7 @@ bool ElasticFusion::denseEnough(const Img<Eigen::Matrix<unsigned char, 3, 1>> & 
 
 void ElasticFusion::processFrame(const unsigned char * rgb,
                                  const unsigned short * depth,
+                                 std::vector<float> & icpRes,
                                  const int64_t & timestamp,
                                  const Eigen::Matrix4f * inPose,
                                  const float weightMultiplier,
@@ -341,13 +342,20 @@ void ElasticFusion::processFrame(const unsigned char * rgb,
 
             botFramesOdometry->getIncrementalTransformation(deltaMotion, timestamp);
 
+            std::vector<float> icpResiduals (Resolution::getInstance().width() * Resolution::getInstance().height());
+
             frameToModel.getIncrementalTransformation(trans,
                                                       rot,
                                                       rgbOnly,
                                                       icpWeight,
                                                       pyramid,
                                                       fastOdom,
-                                                      so3, deltaMotion);
+                                                      so3,
+                                                      deltaMotion,
+                                                      icpResiduals);
+
+            std::copy(icpResiduals.begin(), icpResiduals.end(), icpRes.begin());
+
             TOCK("odom");
 
 #ifdef BENCHMARKEF
@@ -652,7 +660,8 @@ void ElasticFusion::processFrame(const unsigned char * rgb,
         std::chrono::high_resolution_clock::time_point fusionT0  = std::chrono::high_resolution_clock::now();
 #endif
 
-        if(!rgbOnly && trackingOk && !lost)
+
+        if(!rgbOnly && trackingOk && !lost )
         {
             TICK("indexMap");
             indexMap.predictIndices(currPose, tick, globalModel.model(), maxDepthProcessed, timeDelta);

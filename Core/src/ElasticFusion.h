@@ -40,6 +40,7 @@
 #include <pangolin/gl/glcuda.h>
 #include <ctime>
 
+
 // uncomment to enable benchmarking
 #define BENCHMARKEF
 
@@ -103,6 +104,7 @@ class ElasticFusion
          */
         void processFrame(const unsigned char * rgb,
                           const unsigned short * depth,
+                          std::vector<float> & icpResiduals,
                           const int64_t & timestamp,
                           const Eigen::Matrix4f * inPose = 0,
                           const float weightMultiplier = 1.f,
