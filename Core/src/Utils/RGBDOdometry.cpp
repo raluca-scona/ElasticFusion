@@ -758,6 +758,7 @@ void RGBDOdometry::getIncrementalTransformation(Eigen::Vector3f & trans,
         numIters += iterations[i];
     }
 
+
     for(int i = NUM_PYRS - 1; i >= 0; i--)
     {
         if(rgb)
@@ -949,6 +950,7 @@ void RGBDOdometry::getIncrementalTransformation(Eigen::Vector3f & trans,
 
             //using Lie Algebra representation for Rotations
             Eigen::Matrix3f resultRtRot = resultRt.cast<float>().topLeftCorner(3,3);
+            Eigen::Matrix3f rotResidualMatrix = botInvRot * resultRtRot.inverse();
             Eigen::Vector3f rotResidual = OdometryProvider::rodrigues2(botInvRot * resultRtRot.inverse());
 
             botFrames6DoFResidual(0, 0) = botFramesVec(0, 0) - currRtVec(0, 0);
@@ -963,19 +965,19 @@ void RGBDOdometry::getIncrementalTransformation(Eigen::Vector3f & trans,
             botFramesJac(1, 1) = -1;
             botFramesJac(2, 2) = -1;
 
-            //computing Jacobian
+            //computing Jacobian - move this to its own class
             double r11, r12, r13, r21, r22, r23, r31, r32, r33;
-            r11 = botInvRot(0, 0);
-            r12 = botInvRot(0, 1);
-            r13 = botInvRot(0, 2);
+            r11 = rotResidualMatrix(0, 0);
+            r12 = rotResidualMatrix(0, 1);
+            r13 = rotResidualMatrix(0, 2);
 
-            r21 = botInvRot(1, 0);
-            r22 = botInvRot(1, 1);
-            r23 = botInvRot(1, 2);
+            r21 = rotResidualMatrix(1, 0);
+            r22 = rotResidualMatrix(1, 1);
+            r23 = rotResidualMatrix(1, 2);
 
-            r31 = botInvRot(2, 0);
-            r32 = botInvRot(2, 1);
-            r33 = botInvRot(2, 2);
+            r31 = rotResidualMatrix(2, 0);
+            r32 = rotResidualMatrix(2, 1);
+            r33 = rotResidualMatrix(2, 2);
 
             double traceR = r11 + r22 + r33;
 
@@ -1034,8 +1036,7 @@ void RGBDOdometry::getIncrementalTransformation(Eigen::Vector3f & trans,
                 result = lastA.ldlt().solve(lastb);
             }
 
-            /*
-            if(icp && rgb)
+            /*if(icp && rgb)
             {
                 double w = icpWeight;
                 lastA =   dA_rgbd + w * w * dA_icp;
