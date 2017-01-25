@@ -108,8 +108,8 @@ bool Deformation::constrain(std::vector<Ferns::Frame*> & ferns,
             rawPoses.push_back(&ferns.at(i)->pose);
         }
 
-        if(fernMatch)
-        {
+        //if(fernMatch)
+        //{
             //Also apply to the current full pose graph (this might be silly :D)
             for(size_t i = 0; i < poseGraph.size(); i++)
             {
@@ -117,7 +117,7 @@ bool Deformation::constrain(std::vector<Ferns::Frame*> & ferns,
                 poses.push_back(poseGraph.at(i).second);
                 rawPoses.push_back(&poseGraph.at(i).second);
             }
-        }
+        //}
 
         def.setPosesSeq(&times, poses);
 

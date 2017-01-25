@@ -291,6 +291,9 @@ void ElasticFusion::processFrame(const unsigned char * rgb,
     {
         botFramesOdometry->initialisePose(currPose, timestamp);
 
+        //sometimes botframes does not initialise the pose properly. if z is smaller than 1.5 meters, return
+        if (currPose(2, 3) < 1.5) return;
+
         computeFeedbackBuffers();
 
         globalModel.initialise(*feedbackBuffers[FeedbackBuffer::RAW], *feedbackBuffers[FeedbackBuffer::FILTERED]);
@@ -719,6 +722,7 @@ void ElasticFusion::processFrame(const unsigned char * rgb,
 
     }
 
+
     poseGraph.push_back(std::pair<unsigned long long int, Eigen::Matrix4f>(tick, currPose));
     poseLogTimes.push_back(timestamp);
 
@@ -817,24 +821,7 @@ void ElasticFusion::normaliseDepth(const float & minVal, const float & maxVal)
 
 void ElasticFusion::savePlyAndTrajectory()
 {
-    std::string filename = saveFilename;
-
-    time_t rawTime;
-    struct tm * timeInfo;
-    char buffer[80];
-
-    time (&rawTime);
-    timeInfo = localtime(&rawTime);
-
-    strftime(buffer,80,"-%d-%m-%Y-%I-%M-%S",timeInfo);
-    std::string timeString(buffer);
-
-    if (filename.empty()) {
-        filename.append("ef-map");
-    }
-
-    filename.append(timeString);
-    filename.append(".ply");
+    std::string filename = "/home/raluca/ef-statistics/ef-map-"+saveFilename+".ply";
 
     // Open file
     std::ofstream fs;
@@ -932,17 +919,8 @@ void ElasticFusion::savePlyAndTrajectory()
 
     delete [] mapData;
 
-
     //Output deformed pose graph
-    std::string fname = saveFilename;
-
-    if (fname.empty()) {
-        fname.append("ef-trajectory");
-    }
-
-    fname.append(timeString);
-
-    fname.append(".txt");
+    std::string fname =  "/home/raluca/ef-statistics/" + saveFilename + "ef-trajectory.txt";
 
     std::ofstream f;
     f.open(fname.c_str(), std::fstream::out);
@@ -957,11 +935,32 @@ void ElasticFusion::savePlyAndTrajectory()
         }
         else
         {
-            strs << std::setprecision(6) << std::fixed << (double)poseLogTimes.at(i) / 1000000.0 << " ";
+            strs << std::setprecision(6) << std::fixed << (double)poseLogTimes.at(i) /*/ 1000000.0 */<< " ";
         }
 
-        Eigen::Vector3f trans = poseGraph.at(i).second.topRightCorner(3, 1);
-        Eigen::Matrix3f rot = poseGraph.at(i).second.topLeftCorner(3, 3);
+        Eigen::Matrix4f headToNominalCamera = Eigen::Matrix4f::Zero();
+        Eigen::Matrix4f cameraToHead = Eigen::Matrix4f::Zero();
+        Eigen::Matrix4f cameraRightHand = Eigen::Matrix4f::Zero();
+        headToNominalCamera(0, 0) = 1;
+        headToNominalCamera(1, 1) = -1;
+        headToNominalCamera(1, 3) =  0.0350;
+        headToNominalCamera(2, 2) = -1;
+        headToNominalCamera(2, 3) = -0.002;
+        headToNominalCamera(3, 3) = 1;
+
+        cameraToHead(0, 1) = -1;
+        cameraToHead(0, 3) = 0.035;
+        cameraToHead(1, 2) = -1;
+        cameraToHead(1, 3) = -0.002;
+        cameraToHead(2, 0) = 1;
+        cameraToHead(3, 3) = 1;
+
+        cameraRightHand = cameraToHead * headToNominalCamera;
+
+        Eigen::Matrix4f poseInRightHandSystem = poseGraph.at(i).second * cameraRightHand;
+
+        Eigen::Vector3f trans = poseInRightHandSystem.topRightCorner(3, 1);
+        Eigen::Matrix3f rot = poseInRightHandSystem.topLeftCorner(3, 3);
 
         f << strs.str() << trans(0) << " " << trans(1) << " " << trans(2) << " ";
 
