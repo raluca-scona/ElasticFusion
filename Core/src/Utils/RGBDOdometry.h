@@ -68,6 +68,7 @@ class RGBDOdometry
                                           const bool & fastOdom,
                                           const bool & so3,
                                           Eigen::Matrix4f botFramesDelta,
+                                          const bool useBotFramesOdometry,
                                           std::vector<float> & icpResiduals);
 
         Eigen::MatrixXd getCovariance();

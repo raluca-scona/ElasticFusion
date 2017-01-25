@@ -97,6 +97,7 @@ ElasticFusion::ElasticFusion(const int timeDelta,
 }
 
 ElasticFusion::ElasticFusion(BotFrames * botFrames,
+                             const bool useBotFramesOdometry,
                              std::string cameraFrame,
                              std::string worldFrame,
                              bool useVicon,
@@ -137,7 +138,7 @@ ElasticFusion::ElasticFusion(BotFrames * botFrames,
  {
     botFrames = botFrames;
     botFramesOdometry = new BotFramesOdometry(botFrames, useVicon, cameraFrame, worldFrame, pelvisFrame, viconFrame);
-    useBotFramesOdometry = false;
+    this->useBotFramesOdometry = useBotFramesOdometry;
 }
 
 
@@ -306,7 +307,7 @@ void ElasticFusion::processFrame(const unsigned char * rgb,
 
         bool trackingOk = true;
 
-        if( (bootstrap || !inPose) && !useBotFramesOdometry)
+        if( bootstrap || !inPose )
         {
 
             TICK("autoFill");
@@ -355,6 +356,7 @@ void ElasticFusion::processFrame(const unsigned char * rgb,
                                                       fastOdom,
                                                       so3,
                                                       deltaMotion,
+                                                      useBotFramesOdometry,
                                                       icpResiduals);
 
             std::copy(icpResiduals.begin(), icpResiduals.end(), icpRes.begin());
@@ -429,7 +431,7 @@ void ElasticFusion::processFrame(const unsigned char * rgb,
             currPose.topRightCorner(3, 1) = trans;
             currPose.topLeftCorner(3, 3) = rot;
         }
-        else if (useBotFramesOdometry) {
+        else if ( false /*useBotFramesOdometry*/ ) {
 
             Eigen::Matrix4f deltaMotion = Eigen::Matrix4f::Identity();
 
@@ -573,6 +575,7 @@ void ElasticFusion::processFrame(const unsigned char * rgb,
             Eigen::Vector3f trans = currPose.topRightCorner(3, 1);
             Eigen::Matrix<float, 3, 3, Eigen::RowMajor> rot = currPose.topLeftCorner(3, 3);
 
+            //looking for local loop closures
             modelToModel.getIncrementalTransformation(trans,
                                                       rot,
                                                       false,

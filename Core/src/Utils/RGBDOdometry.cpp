@@ -607,9 +607,6 @@ void RGBDOdometry::getIncrementalTransformation(Eigen::Vector3f & trans,
 }
 
 
-
-
-
 void RGBDOdometry::getIncrementalTransformation(Eigen::Vector3f & trans,
                                                 Eigen::Matrix<float, 3, 3, Eigen::RowMajor> & rot,
                                                 const bool & rgbOnly,
@@ -618,11 +615,13 @@ void RGBDOdometry::getIncrementalTransformation(Eigen::Vector3f & trans,
                                                 const bool & fastOdom,
                                                 const bool & so3,
                                                 Eigen::Matrix4f botFramesDelta,
+                                                const bool useBotFramesOdometry,
                                                 std::vector<float> & icpResiduals)
 {
 
     bool icp = !rgbOnly && icpWeight > 0;
     bool rgb = rgbOnly || icpWeight < 100;
+    bool bot = useBotFramesOdometry;
 
     Eigen::Matrix<float, 3, 3, Eigen::RowMajor> Rprev = rot;
     Eigen::Vector3f tprev = trans;
@@ -875,7 +874,6 @@ void RGBDOdometry::getIncrementalTransformation(Eigen::Vector3f & trans,
             lastICPError = sqrt(residual[0]) / residual[1];
             lastICPCount = residual[1];
 
-
             if (j == (iterations[i] - 1) && i == 0) {
                 float icpRes[ vmap_curr.cols() * vmap_curr.rows() /3];
 
@@ -883,7 +881,6 @@ void RGBDOdometry::getIncrementalTransformation(Eigen::Vector3f & trans,
 
                 std::copy(icpRes, icpRes + vmap_curr.cols() * vmap_curr.cols(), icpResiduals.begin());
             }
-
 
             Eigen::Matrix<float, 6, 6, Eigen::RowMajor> A_rgbd;
             Eigen::Matrix<float, 6, 1> b_rgbd;
@@ -1024,25 +1021,38 @@ void RGBDOdometry::getIncrementalTransformation(Eigen::Vector3f & trans,
             Eigen::Matrix<double, 6, 6, Eigen::RowMajor> dA_bot = botFramesCount * botFramesJac.transpose() * botFramesJac;
             Eigen::Matrix<double, 6, 1> db_bot = -1 * botFramesCount * botFramesJac.transpose() * botFrames6DoFResidual;
 
-
-            if(icp && rgb)
+            if(bot)
             {
-                double w = icpWeight;
                 double wbot = 100.;
 
-                lastA =  dA_rgbd + w * w * dA_icp + wbot * dA_bot;
-                lastb =  db_rgbd + w * db_icp + wbot * db_bot;
+                lastA = wbot * dA_bot;
+                lastb = wbot * db_bot;
+
+                if (rgb) {
+
+                    lastA += dA_rgbd;
+                    lastb += db_rgbd;
+
+                }
+
+                if (icp) {
+
+                    double w = icpWeight;
+
+                    lastA += w * w * dA_icp;
+                    lastb += w * db_icp;
+
+                }
 
                 result = lastA.ldlt().solve(lastb);
             }
-
-            /*if(icp && rgb)
+            else if(icp && rgb)
             {
                 double w = icpWeight;
                 lastA =   dA_rgbd + w * w * dA_icp;
                 lastb =  db_rgbd + w * db_icp;
                 result = lastA.ldlt().solve(lastb);
-            } */
+            }
             else if(icp)
             {
                 lastA = dA_icp;

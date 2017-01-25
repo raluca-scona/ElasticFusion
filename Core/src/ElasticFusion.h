@@ -70,6 +70,7 @@ class ElasticFusion
                       const std::string fileName = "");
 
         ElasticFusion(BotFrames * botFrames,
+                      const bool useBotFramesOdometry = true,
                       std::string cameraFrame = "MULTISENSE_CAMERA_LEFT",
                       std::string worldFrame = "local",
                       bool useVicon = true,
@@ -376,7 +377,7 @@ class ElasticFusion
         bool so3;
         bool frameToFrameRGB;
         float depthCutoff;
-        bool useBotFramesOdometry = false;
+        bool useBotFramesOdometry = true;
 };
 
 #endif /* ELASTICFUSION_H_ */
