@@ -15,36 +15,40 @@ BotFramesOdometry::~BotFramesOdometry()
 
 void BotFramesOdometry::initialisePose(Eigen::Matrix4f & pose, uint64_t timestamp) {
     double curr_position_camera[16];
-    double curr_position_vicon[16];
+    double curr_position_body[16];
 
     int statusCamera = 1;
-    int statusVicon = 1;
+    int statusBody = 1;
 
     if (useVicon) {
         statusCamera = bot_frames_get_trans_mat_4x4_with_utime(botFrames, cameraFrame.c_str(),  pelvisFrame.c_str(), timestamp, curr_position_camera);
-        statusVicon = bot_frames_get_trans_mat_4x4_with_utime(botFrames, viconFrame.c_str(),  worldFrame.c_str(), timestamp, curr_position_vicon);
+        statusBody  = bot_frames_get_trans_mat_4x4_with_utime(botFrames, viconFrame.c_str(),  worldFrame.c_str(), timestamp, curr_position_body);
+    } else if ( pelvisFrame.compare("body_alt") == 0) { //they compare equally
+        statusCamera = bot_frames_get_trans_mat_4x4_with_utime(botFrames, cameraFrame.c_str(),  "body", timestamp, curr_position_camera);
+        statusBody  = bot_frames_get_trans_mat_4x4_with_utime(botFrames, pelvisFrame.c_str(),  worldFrame.c_str(), timestamp, curr_position_body);
     } else {
         statusCamera = bot_frames_get_trans_mat_4x4_with_utime(botFrames, cameraFrame.c_str(),  worldFrame.c_str(), timestamp, curr_position_camera);
     }
 
-    if (!statusCamera || !statusVicon)
+    if (!statusCamera || !statusBody )
     {
         std::cout << "BotFramesOdometry: bot_frames returned false";
         return;
     }
 
     Eigen::Isometry3f currPositionCAM = Eigen::Isometry3f::Identity();
-    Eigen::Isometry3f currPositionVICON = Eigen::Isometry3f::Identity();
+    Eigen::Isometry3f currPositionBody = Eigen::Isometry3f::Identity();
 
     for (int i = 0; i < 4; ++i) {
         for (int j = 0; j < 4; ++j) {
             currPositionCAM(i,j) = float(curr_position_camera[i*4+j]);
-            currPositionVICON(i,j) = float(curr_position_vicon[i*4+j]);
+            currPositionBody (i,j) = float(curr_position_body[i*4+j]);
         }
     }
 
-    if (useVicon) {
-        prevPosition = currPositionVICON * currPositionCAM;
+
+    if (useVicon || pelvisFrame.compare("body_alt") == 0) {
+        prevPosition = currPositionBody  * currPositionCAM;
     } else {
         prevPosition = currPositionCAM;
     }
@@ -56,37 +60,42 @@ void BotFramesOdometry::initialisePose(Eigen::Matrix4f & pose, uint64_t timestam
 void BotFramesOdometry::getIncrementalTransformation(Eigen::Matrix4f & deltaMotion, uint64_t timestamp)
 {
     double curr_position_camera[16];
-    double curr_position_vicon[16];
+    double curr_position_body[16];
 
     int statusCamera = 1;
-    int statusVicon = 1;
+    int statusBody = 1;
 
     if (useVicon) {
         statusCamera = bot_frames_get_trans_mat_4x4_with_utime(botFrames, cameraFrame.c_str(),  pelvisFrame.c_str(), timestamp, curr_position_camera);
-        statusVicon = bot_frames_get_trans_mat_4x4_with_utime(botFrames, viconFrame.c_str(),  worldFrame.c_str(), timestamp, curr_position_vicon);
+        statusBody = bot_frames_get_trans_mat_4x4_with_utime(botFrames, viconFrame.c_str(),  worldFrame.c_str(), timestamp, curr_position_body);
+    } else if ( pelvisFrame.compare("body_alt") == 0) { //they compare equally
+        statusCamera = bot_frames_get_trans_mat_4x4_with_utime(botFrames, cameraFrame.c_str(),  "body", timestamp, curr_position_camera);
+        statusBody  = bot_frames_get_trans_mat_4x4_with_utime(botFrames, pelvisFrame.c_str(),  worldFrame.c_str(), timestamp, curr_position_body);
     } else {
         statusCamera = bot_frames_get_trans_mat_4x4_with_utime(botFrames, cameraFrame.c_str(),  worldFrame.c_str(), timestamp, curr_position_camera);
     }
 
-    if (!statusCamera || !statusVicon)
+    if (!statusCamera || !statusBody)
     {
         std::cout << "BotFramesOdometry: bot_frames returned false";
         return;
     }
 
-    Eigen::Isometry3f currPositionVICON = Eigen::Isometry3f::Identity();
+
+
+    Eigen::Isometry3f currPositionBody = Eigen::Isometry3f::Identity();
     Eigen::Isometry3f currPositionCAM = Eigen::Isometry3f::Identity();
 
 
     for (int i = 0; i < 4; ++i) {
         for (int j = 0; j < 4; ++j) {
             currPositionCAM(i,j) = float(curr_position_camera[i*4+j]);
-            currPositionVICON(i,j) = float(curr_position_vicon[i*4+j]);
+            currPositionBody(i,j) = float(curr_position_body[i*4+j]);
         }
     }
 
-    if (useVicon) {
-        currPosition = currPositionVICON * currPositionCAM;
+    if (useVicon || pelvisFrame.compare("body_alt") == 0) {
+        currPosition = currPositionBody * currPositionCAM;
     } else {
         currPosition = currPositionCAM;
     }
