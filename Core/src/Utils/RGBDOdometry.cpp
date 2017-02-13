@@ -381,9 +381,9 @@ void RGBDOdometry::getIncrementalTransformation(Eigen::Vector3f & trans,
         }
     }
 
-    iterations[0] = fastOdom ? 3 : 10;
-    iterations[1] = pyramid ? 5 : 0;
-    iterations[2] = pyramid ? 4 : 0;
+    iterations[0] = fastOdom ? 3 : 10; //15 for pronto on short log.
+    iterations[1] = pyramid ? 5 : 0; //8
+    iterations[2] = pyramid ? 4 : 0; //5
 
     Eigen::Matrix<float, 3, 3, Eigen::RowMajor> Rprev_inv = Rprev.inverse();
     mat33 device_Rprev_inv = Rprev_inv;
@@ -1029,19 +1029,15 @@ void RGBDOdometry::getIncrementalTransformation(Eigen::Vector3f & trans,
                 lastb = wbot * db_bot;
 
                 if (rgb) {
-
                     lastA += dA_rgbd;
                     lastb += db_rgbd;
-
                 }
 
                 if (icp) {
-
                     double w = icpWeight;
 
                     lastA += w * w * dA_icp;
                     lastb += w * db_icp;
-
                 }
 
                 result = lastA.ldlt().solve(lastb);

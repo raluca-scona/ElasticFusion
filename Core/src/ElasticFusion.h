@@ -308,7 +308,9 @@ class ElasticFusion
 
         //Here be dragons
     private:
-        BotFrames* botFrames;
+        BotFrames* botFrames_;
+        std::string configCameraFrameName;
+        std::string configWorldFrameName;
 
         IndexMap indexMap;
         RGBDOdometry frameToModel;
