@@ -86,13 +86,6 @@ ElasticFusion::ElasticFusion(const int timeDelta,
     createCompute();
     createFeedbackBuffers();
 
-    /*std::string filename = fileName;
-    filename.append(".freiburg");
-
-    std::ofstream file;
-    file.open(filename.c_str(), std::fstream::out);
-    file.close(); */
-
     Stopwatch::getInstance().setCustomSignature(12431231);
 }
 
@@ -369,15 +362,17 @@ void ElasticFusion::processFrame(const unsigned char * rgb,
 #ifdef BENCHMARKEF
             std::chrono::high_resolution_clock::time_point odomT1  = std::chrono::high_resolution_clock::now();
             odomDuration = odomT1 - odomT0;
-#endif
-
-            trackingOk = !reloc || frameToModel.lastICPError < 1e-04;
 
             trackingICPError = frameToModel.lastICPError;
             trackingICPCount = frameToModel.lastICPCount;
 
             trackingRGBError = frameToModel.lastRGBError;
             trackingRGBCount = frameToModel.lastRGBCount;
+#endif
+
+            trackingOk = !reloc || frameToModel.lastICPError < 1e-04;
+
+
 
             if(reloc)
             {
@@ -445,98 +440,6 @@ void ElasticFusion::processFrame(const unsigned char * rgb,
         } else {
             currPose = *inPose;
         }
-
-        /*if (useBotFramesOdometry) {
-            //HERE I MUST MAKE THE CURRPOSE GRAVITY ALIGNED;
-            Eigen::Matrix4f headToNominalCamera = Eigen::Matrix4f::Zero();
-            Eigen::Matrix4f cameraToHead = Eigen::Matrix4f::Zero();
-            Eigen::Matrix4f cameraRightHand = Eigen::Matrix4f::Zero();
-            headToNominalCamera(0, 0) = 1;
-            headToNominalCamera(1, 1) = -1;
-            headToNominalCamera(1, 3) =  0.0350;
-            headToNominalCamera(2, 2) = -1;
-            headToNominalCamera(2, 3) = -0.002;
-            headToNominalCamera(3, 3) = 1;
-
-            cameraToHead(0, 1) = -1;
-            cameraToHead(0, 3) = 0.035;
-            cameraToHead(1, 2) = -1;
-            cameraToHead(1, 3) = -0.002;
-            cameraToHead(2, 0) = 1;
-            cameraToHead(3, 3) = 1;
-
-            cameraRightHand = cameraToHead * headToNominalCamera;
-
-            // GET THE POSE OF THE CAMERA FROM BOT FRAMES IN NOMINAL COORDS - Z UP, X FORWARD
-            double curr_position_camera[16];
-            double curr_position_body[16];
-
-            int statusCamera = bot_frames_get_trans_mat_4x4_with_utime(botFrames_, configCameraFrameName.c_str(),  "body", timestamp, curr_position_camera);
-            int statusBody  = bot_frames_get_trans_mat_4x4_with_utime(botFrames_, "body_alt",  configWorldFrameName.c_str(), timestamp, curr_position_body);
-
-            if (statusCamera && statusBody) {
-                Eigen::Matrix4f botCurrPositionCAM = Eigen::Matrix4f::Zero();
-                Eigen::Matrix4f botCurrPositionBody = Eigen::Matrix4f::Zero();
-
-
-                for (int i = 0; i < 4; ++i) {
-                    for (int j = 0; j < 4; ++j) {
-                        botCurrPositionCAM(i,j) = float(curr_position_camera[i*4+j]);
-                        botCurrPositionBody(i, j) = float(curr_position_body[i*4+j]);
-                    }
-                }
-
-                //setting it to Z up X forward
-                botCurrPositionCAM = botCurrPositionBody * botCurrPositionCAM * cameraRightHand;
-                Eigen::Matrix3f botR = botCurrPositionCAM.topLeftCorner(3, 3);
-
-                float botRoll = atan2(botR(2,1),botR(2,2));
-                float botPitch = -asin(botR(2,0));
-                float botYaw = atan2(botR(1,0),botR(0,0));
-
-                Eigen::Matrix4f efCurrPositionCAM = currPose * cameraRightHand;
-
-                Eigen::Matrix3f efR = efCurrPositionCAM.topLeftCorner(3, 3);
-
-                float efRoll = atan2(efR(2,1), efR(2,2));
-                float efPitch = -asin(efR(2,0));
-                float efYaw = atan2(efR(1,0), efR(0,0));
-
-                std::cout<<"new frame "<<timestamp<<"\n";
-                std::cout<<"roll error "<< (botRoll - efRoll)* 180/M_PI<<"\n";
-                std::cout<<"pitch error "<< (botPitch - efPitch)* 180/M_PI<<"\n";
-                std::cout<<"yaw error "<< (botYaw  - efYaw)* 180/M_PI<<"\n\n";
-
-
-                Eigen::AngleAxisf rollAngleEF(botRoll, Eigen::Vector3f::UnitX());
-                Eigen::AngleAxisf pitchAngleEF(botPitch, Eigen::Vector3f::UnitY());
-                Eigen::AngleAxisf yawAngleEF(efYaw, Eigen::Vector3f::UnitZ());
-
-                Eigen::Quaternion<float> qEF = yawAngleEF * pitchAngleEF * rollAngleEF;
-
-                Eigen::Matrix3f rotationWithBotPitchRoll = qEF.matrix();
-
-                Eigen::Matrix4f wholeBotModifiedTransform = Eigen::Matrix4f::Zero();
-                wholeBotModifiedTransform.topLeftCorner(3, 3) = rotationWithBotPitchRoll;
-                wholeBotModifiedTransform(0, 3) = efCurrPositionCAM(0, 3);
-                wholeBotModifiedTransform(1, 3) = efCurrPositionCAM(1, 3);
-                wholeBotModifiedTransform(2, 3) = efCurrPositionCAM(2, 3);
-                wholeBotModifiedTransform(3, 3) = 1.0;
-
-                wholeBotModifiedTransform = wholeBotModifiedTransform * cameraRightHand.inverse();
-
-                currPose.topLeftCorner(3, 3) = wholeBotModifiedTransform.topLeftCorner(3, 3);
-
-            }
-
-        } */
-
-
-
-
-
-        // READ THE ROLL AND PITCH FROM THIS
-        // TRANSFER IT BACK INTO CURRPOSE TAKING INTO ACCOUNT THAT CURRPOSE IS IN CV COORDS
 
         Eigen::Matrix4f diff = currPose.inverse() * lastPose;
 
@@ -677,7 +580,7 @@ void ElasticFusion::processFrame(const unsigned char * rgb,
                                                       10,
                                                       pyramid,
                                                       fastOdom,
-                                                      true);
+                                                      false);
 
             Eigen::MatrixXd covar = modelToModel.getCovariance();
             bool covOk = true;

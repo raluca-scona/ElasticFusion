@@ -43,7 +43,7 @@
 
 
 // uncomment to enable benchmarking
-#define BENCHMARKEF
+//#define BENCHMARKEF
 
 #ifdef BENCHMARKEF
 #include <chrono>
