@@ -1025,8 +1025,16 @@ void RGBDOdometry::getIncrementalTransformation(Eigen::Vector3f & trans,
             {
                 double wbot = 100.;
 
-                lastA = wbot * dA_bot;
-                lastb = wbot * db_bot;
+                float translation = sqrt(botFramesDelta(0, 3)*botFramesDelta(0, 3) + botFramesDelta(1, 3)*botFramesDelta(1, 3) + botFramesDelta(2, 3)*botFramesDelta(2, 3));
+
+                if (translation > 0.08) {
+                    std::cout<<"Incremental Camera Motion too large, not integrating KI "<<translation<<"\n";
+                    lastA = Eigen::Matrix<double, 6, 6, Eigen::RowMajor>::Zero();
+                    lastb = Eigen::Matrix<double, 6, 1>::Zero();
+                } else {
+                    lastA = wbot * dA_bot;
+                    lastb = wbot * db_bot;
+                }
 
                 if (rgb) {
                     lastA += dA_rgbd;
