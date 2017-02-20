@@ -110,6 +110,8 @@ class ElasticFusion
                           const int64_t & timestamp,
                           const Eigen::Matrix4f * inPose = 0,
                           const float weightMultiplier = 1.f,
+                          const bool integrateBotFrames = true,
+                          const bool resetBotFramesInitPose = false,
                           const bool bootstrap = false);
 
         /**

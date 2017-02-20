@@ -269,6 +269,8 @@ void ElasticFusion::processFrame(const unsigned char * rgb,
                                  const int64_t & timestamp,
                                  const Eigen::Matrix4f * inPose,
                                  const float weightMultiplier,
+                                 const bool integrateBotFrames,
+                                 const bool resetBotFramesInitPose,
                                  const bool bootstrap)
 {
     TICK("Run");
@@ -338,9 +340,18 @@ void ElasticFusion::processFrame(const unsigned char * rgb,
 #endif
 
 
+
             Eigen::Matrix4f deltaMotion = Eigen::Matrix4f::Identity();
 
-            botFramesOdometry->getIncrementalTransformation(deltaMotion, timestamp);
+            if (integrateBotFrames) {
+                //std::cout<<"from ef - use bot frames as normal\n";
+                botFramesOdometry->getIncrementalTransformation(deltaMotion, timestamp);
+            }
+
+            if (resetBotFramesInitPose) {
+                //std::cout<<"from ef - reset bot frames\n";
+                botFramesOdometry->resetStartPose(timestamp);
+            }
 
             std::vector<float> icpResiduals (Resolution::getInstance().width() * Resolution::getInstance().height());
 
@@ -352,7 +363,7 @@ void ElasticFusion::processFrame(const unsigned char * rgb,
                                                       fastOdom,
                                                       so3,
                                                       deltaMotion,
-                                                      useBotFramesOdometry,
+                                                      integrateBotFrames,
                                                       icpResiduals);
 
             std::copy(icpResiduals.begin(), icpResiduals.end(), icpRes.begin());

@@ -1027,6 +1027,9 @@ void RGBDOdometry::getIncrementalTransformation(Eigen::Vector3f & trans,
 
                 float translation = sqrt(botFramesDelta(0, 3)*botFramesDelta(0, 3) + botFramesDelta(1, 3)*botFramesDelta(1, 3) + botFramesDelta(2, 3)*botFramesDelta(2, 3));
 
+                //std::cout<<"from ef - use bot frames as normal\n";
+
+
                 if (translation > 0.08) {
                     std::cout<<"Incremental Camera Motion too large, not integrating KI "<<translation<<"\n";
                     lastA = Eigen::Matrix<double, 6, 6, Eigen::RowMajor>::Zero();
@@ -1052,6 +1055,9 @@ void RGBDOdometry::getIncrementalTransformation(Eigen::Vector3f & trans,
             }
             else if(icp && rgb)
             {
+                //std::cout<<"from ef - not use bot frames\n";
+
+
                 double w = icpWeight;
                 lastA =   dA_rgbd + w * w * dA_icp;
                 lastb =  db_rgbd + w * db_icp;

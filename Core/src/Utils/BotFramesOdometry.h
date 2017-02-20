@@ -15,6 +15,8 @@ class BotFramesOdometry
 
         void initialisePose(Eigen::Matrix4f & pose, uint64_t timestamp);
 
+        void resetStartPose(uint64_t timestamp);
+
         void getIncrementalTransformation(Eigen::Matrix4f & deltaMotion,
                                           uint64_t timestamp);
         Eigen::MatrixXd getCovariance();

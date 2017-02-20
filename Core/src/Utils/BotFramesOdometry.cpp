@@ -13,6 +13,47 @@ BotFramesOdometry::~BotFramesOdometry()
 {
 }
 
+void BotFramesOdometry::resetStartPose(uint64_t timestamp) {
+    double curr_position_camera[16];
+    double curr_position_body[16];
+
+    int statusCamera = 1;
+    int statusBody = 1;
+
+    if (useVicon) {
+        statusCamera = bot_frames_get_trans_mat_4x4_with_utime(botFrames, cameraFrame.c_str(),  pelvisFrame.c_str(), timestamp, curr_position_camera);
+        statusBody  = bot_frames_get_trans_mat_4x4_with_utime(botFrames, viconFrame.c_str(),  worldFrame.c_str(), timestamp, curr_position_body);
+    } else if ( pelvisFrame.compare("body_alt") == 0) { //they compare equally
+        statusCamera = bot_frames_get_trans_mat_4x4_with_utime(botFrames, cameraFrame.c_str(),  "body", timestamp, curr_position_camera);
+        statusBody  = bot_frames_get_trans_mat_4x4_with_utime(botFrames, pelvisFrame.c_str(),  worldFrame.c_str(), timestamp, curr_position_body);
+    } else {
+        statusCamera = bot_frames_get_trans_mat_4x4_with_utime(botFrames, cameraFrame.c_str(),  worldFrame.c_str(), timestamp, curr_position_camera);
+    }
+
+    if (!statusCamera || !statusBody )
+    {
+        std::cout << "BotFramesOdometry: bot_frames returned false";
+        return;
+    }
+
+    Eigen::Isometry3f currPositionCAM = Eigen::Isometry3f::Identity();
+    Eigen::Isometry3f currPositionBody = Eigen::Isometry3f::Identity();
+
+    for (int i = 0; i < 4; ++i) {
+        for (int j = 0; j < 4; ++j) {
+            currPositionCAM(i,j) = float(curr_position_camera[i*4+j]);
+            currPositionBody (i,j) = float(curr_position_body[i*4+j]);
+        }
+    }
+
+
+    if (useVicon || pelvisFrame.compare("body_alt") == 0) {
+        prevPosition = currPositionBody  * currPositionCAM;
+    } else {
+        prevPosition = currPositionCAM;
+    }
+}
+
 void BotFramesOdometry::initialisePose(Eigen::Matrix4f & pose, uint64_t timestamp) {
     double curr_position_camera[16];
     double curr_position_body[16];
