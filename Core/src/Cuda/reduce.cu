@@ -407,7 +407,14 @@ struct ICPReduction
             // penultimate val holds residual for this point
             int y = i / cols;
             int x = i - (y * cols);
-            icp_per_pixel_residual.ptr (y)[x] = val.residual; //- this is correct
+
+
+            if (vmap_curr.ptr (y + 2 * rows)[x] > 0.0)
+                icp_per_pixel_residual.ptr (y)[x] = 1;
+            else
+                icp_per_pixel_residual.ptr (y)[x] = 0;
+
+            //icp_per_pixel_residual.ptr (y)[x] = val.residual; //- this is correct
 
             sum.add(val);
         }

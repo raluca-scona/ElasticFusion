@@ -874,13 +874,17 @@ void RGBDOdometry::getIncrementalTransformation(Eigen::Vector3f & trans,
             lastICPError = sqrt(residual[0]) / residual[1];
             lastICPCount = residual[1];
 
-            if (j == (iterations[i] - 1) && i == 0) {
+            //if (j == (iterations[i] - 1) && i == 0) {
                 float icpRes[ vmap_curr.cols() * vmap_curr.rows() /3];
 
                 icp_perpixel_residual.download(&icpRes[0], icp_perpixel_residual.cols() * 4);
 
                 std::copy(icpRes, icpRes + vmap_curr.cols() * vmap_curr.cols(), icpResiduals.begin());
-            }
+            //}
+
+
+
+
 
             Eigen::Matrix<float, 6, 6, Eigen::RowMajor> A_rgbd;
             Eigen::Matrix<float, 6, 1> b_rgbd;
@@ -931,7 +935,6 @@ void RGBDOdometry::getIncrementalTransformation(Eigen::Vector3f & trans,
             Eigen::Matrix3f botInvRot = botInv.topLeftCorner(3,3);
             Eigen::Vector3f botInvRotTwist = OdometryProvider::rodrigues2(botInvRot);
 
-
             botFramesVec(0, 0) = botInv(0, 3);
             botFramesVec(1, 0) = botInv(1, 3);
             botFramesVec(2, 0) = botInv(2, 3);
@@ -948,7 +951,7 @@ void RGBDOdometry::getIncrementalTransformation(Eigen::Vector3f & trans,
             //using Lie Algebra representation for Rotations
             Eigen::Matrix3f resultRtRot = resultRt.cast<float>().topLeftCorner(3,3);
             Eigen::Matrix3f rotResidualMatrix = botInvRot * resultRtRot.inverse();
-            Eigen::Vector3f rotResidual = OdometryProvider::rodrigues2(botInvRot * resultRtRot.inverse());
+            Eigen::Vector3f rotResidual = OdometryProvider::rodrigues2(rotResidualMatrix);
 
             botFrames6DoFResidual(0, 0) = botFramesVec(0, 0) - currRtVec(0, 0);
             botFrames6DoFResidual(1, 0) = botFramesVec(1, 0) - currRtVec(1, 0);
@@ -957,10 +960,7 @@ void RGBDOdometry::getIncrementalTransformation(Eigen::Vector3f & trans,
             botFrames6DoFResidual(4, 0) = !isnan(rotResidual(1, 0)) ? rotResidual(1, 0) : (botFramesVec(4, 0) - currRtVec(4, 0));
             botFrames6DoFResidual(5, 0) = !isnan(rotResidual(2, 0)) ? rotResidual(2, 0) : (botFramesVec(5, 0) - currRtVec(5, 0));
 
-            Eigen::Matrix<double, 6, 6, Eigen::RowMajor> botFramesJac = Eigen::Matrix<double, 6,6, Eigen::RowMajor>::Identity();
-            botFramesJac(0, 0) = -1;
-            botFramesJac(1, 1) = -1;
-            botFramesJac(2, 2) = -1;
+
 
             //computing Jacobian - move this to its own class
             double r11, r12, r13, r21, r22, r23, r31, r32, r33;
@@ -996,6 +996,57 @@ void RGBDOdometry::getIncrementalTransformation(Eigen::Vector3f & trans,
 
             double d3dz = -0.5*(1.0*r11 + 1.0*r22)*pow((-1.0*pow((0.5*traceR - 0.5),2) + 1.0),-0.5)*acos(0.5*traceR - 0.5) - (-1.0*r12 + r21)*(0.25*r12 - 0.25*r21)/(pow((0.5*traceR - 0.5),2) - 1.0) - 0.5*(-1.0*r12 + r21)*(0.5*r12 - 0.5*r21)*(0.5*traceR - 0.5)*pow((-1.0*pow((0.5*traceR - 0.5),2) + 1.0), -1.5)*acos(0.5*traceR - 0.5);
 
+
+            Eigen::Matrix3f rotResidualSkew = Eigen::Matrix3f::Zero();
+
+            float a1 = rotResidual(0);
+            float a2 = rotResidual(1);
+            float a3 = rotResidual(2);
+
+            float norm = sqrt(a1*a1 + a2*a2 + a3*a3);
+
+            rotResidualSkew(0, 0) = 0;
+            rotResidualSkew(0, 1) = -a3;
+            rotResidualSkew(0, 2) = a2;
+            rotResidualSkew(1, 0) = a3;
+            rotResidualSkew(1, 1) = 0;
+            rotResidualSkew(1, 2) = -a1;
+            rotResidualSkew(2, 0) = -a2;
+            rotResidualSkew(2, 1) = a1;
+            rotResidualSkew(2, 2) = 0;
+
+            Eigen::Matrix3f rotationJacobian = -1 * ( Eigen::Matrix3f::Identity() + 0.5 * rotResidualSkew + ( 1.0 / (norm * norm) + (1. + cos(norm))/(2.*norm*sin(norm)) ) * rotResidualSkew * rotResidualSkew );
+
+            //rotationJacobian = skew symmetric of rotResidual
+
+            std::cout<<"\n";
+            std::cout<<"d1dx "<<rotationJacobian(0, 0)<<" " <<d1dx<<"\n";
+            std::cout<<"d1dy "<<rotationJacobian(0, 1)<<" " <<d1dy<<"\n";
+            std::cout<<"d1dz "<<rotationJacobian(0, 2)<<" " <<d1dz<<"\n";
+
+            std::cout<<"d2dx "<<rotationJacobian(1, 0)<<" " <<d2dx<<"\n";
+            std::cout<<"d2dy "<<rotationJacobian(1, 1)<<" " <<d2dy<<"\n";
+            std::cout<<"d2dz "<<rotationJacobian(1, 2)<<" " <<d2dz<<"\n";
+
+            std::cout<<"d3dx "<<rotationJacobian(2, 0)<<" " <<d3dx<<"\n";
+            std::cout<<"d3dy "<<rotationJacobian(2, 1)<<" " <<d3dy<<"\n";
+            std::cout<<"d3dz "<<rotationJacobian(2, 2)<<" " <<d3dz<<"\n";
+
+          /*  d1dx = rotationJacobian(0, 0);
+            d1dy = rotationJacobian(0, 1);
+            d1dz = rotationJacobian(0, 2);
+
+            d2dx = rotationJacobian(2, 0);
+            d2dy = rotationJacobian(2, 1);
+            d2dz = rotationJacobian(2, 2);
+
+            d3dx = rotationJacobian(3, 0);
+            d3dy = rotationJacobian(3, 1);
+            d3dz = rotationJacobian(3, 2); */
+
+
+            Eigen::Matrix<double, 6, 6, Eigen::RowMajor> botFramesJac = Eigen::Matrix<double, 6,6, Eigen::RowMajor>::Identity();
+
             botFramesJac(0, 0) = -1;
             botFramesJac(1, 1) = -1;
             botFramesJac(2, 2) = -1;
@@ -1014,9 +1065,33 @@ void RGBDOdometry::getIncrementalTransformation(Eigen::Vector3f & trans,
 
             double numPixels = vmap_curr.cols() * vmap_curr.rows() / 3.0;
 
-            float icpCountPercentage = lastICPCount * 100. / numPixels;
-            float rgbCountPercentage = lastRGBCount * 100. / numPixels;
-            float botFramesCount = ( std::max (std::max(icpCountPercentage, rgbCountPercentage) + 10. , 15.) ) / 100. * numPixels  ;
+
+            // std::cout<<lastICPCount<<" "<< lastRGBCount<<" " <<numPixels<<"\n";
+
+             float howManyValid = 0;
+
+             for (int k=0; k< numPixels; k++) {
+                 if (icpRes[k]>0) {
+                     howManyValid++;
+                 }
+             }
+
+             std::cout<<howManyValid<<" " << howManyValid * 100. / numPixels << " " <<numPixels<<"\n";
+
+
+            //float icpCountPercentage = lastICPCount * 100. / numPixels;
+            //float rgbCountPercentage = lastRGBCount * 100. / numPixels;
+
+
+            float icpCountPercentage = lastICPCount * 100. / howManyValid;
+            float rgbCountPercentage = lastRGBCount * 100. / howManyValid;
+
+
+            float botFramesCount = ( std::max (std::max(icpCountPercentage, rgbCountPercentage) + 10. , 15.) ) / 100. * howManyValid  ;
+
+
+
+
 
             Eigen::Matrix<double, 6, 6, Eigen::RowMajor> dA_bot = botFramesCount * botFramesJac.transpose() * botFramesJac;
             Eigen::Matrix<double, 6, 1> db_bot = -1 * botFramesCount * botFramesJac.transpose() * botFrames6DoFResidual;

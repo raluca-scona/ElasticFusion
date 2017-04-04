@@ -275,6 +275,7 @@ void ElasticFusion::processFrame(const unsigned char * rgb,
 {
     TICK("Run");
 
+
     textures[GPUTexture::DEPTH_RAW]->texture->Upload(depth, GL_LUMINANCE_INTEGER_EXT, GL_UNSIGNED_SHORT);
     textures[GPUTexture::RGB]->texture->Upload(rgb, GL_RGB, GL_UNSIGNED_BYTE);
 
@@ -338,8 +339,6 @@ void ElasticFusion::processFrame(const unsigned char * rgb,
 #ifdef BENCHMARKEF
             std::chrono::high_resolution_clock::time_point odomT0  = std::chrono::high_resolution_clock::now();
 #endif
-
-
 
             Eigen::Matrix4f deltaMotion = Eigen::Matrix4f::Identity();
 
