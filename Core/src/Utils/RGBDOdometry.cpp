@@ -87,6 +87,8 @@ RGBDOdometry::RGBDOdometry(int width,
     vmaps_curr_.resize(NUM_PYRS);
     nmaps_curr_.resize(NUM_PYRS);
 
+    status_map.resize(NUM_PYRS);
+
     for (int i = 0; i < NUM_PYRS; ++i)
     {
         int pyr_rows = height >> i;
@@ -99,6 +101,8 @@ RGBDOdometry::RGBDOdometry(int width,
 
         vmaps_curr_[i].create (pyr_rows*3, pyr_cols);
         nmaps_curr_[i].create (pyr_rows*3, pyr_cols);
+
+        status_map[i].create (pyr_rows*3, pyr_cols);
     }
 
     vmaps_tmp.create(height * 4 * width);
@@ -136,6 +140,8 @@ void RGBDOdometry::initICP(GPUTexture * filteredDepth, const float depthCutoff)
     {
         createVMap(intr(i), depth_tmp[i], vmaps_curr_[i], depthCutoff);
         createNMap(vmaps_curr_[i], nmaps_curr_[i]);
+        createStatusMap(depth_tmp[i], status_map[i], depthCutoff);
+
     }
 
     cudaDeviceSynchronize();
@@ -485,7 +491,12 @@ void RGBDOdometry::getIncrementalTransformation(Eigen::Vector3f & trans,
             DeviceArray2D<float>& vmap_g_prev = vmaps_g_prev_[i];
             DeviceArray2D<float>& nmap_g_prev = nmaps_g_prev_[i];
 
+            DeviceArray2D<float>& status_map_curr = status_map[i];
+
             float residual[2];
+
+            DeviceArray2D<float> icp_perpixel_residual;
+            icp_perpixel_residual.create(vmap_curr.rows() / 3, vmap_curr.cols());
 
             if(icp)
             {
@@ -506,10 +517,29 @@ void RGBDOdometry::getIncrementalTransformation(Eigen::Vector3f & trans,
                         A_icp.data(),
                         b_icp.data(),
                         &residual[0],
+                        icp_perpixel_residual,
                         GPUConfig::getInstance().icpStepThreads,
                         GPUConfig::getInstance().icpStepBlocks);
                 TOCK("icpStep");
             }
+
+            if (j == iterations[i] && i == 0 && so3) {
+                float icpRes[ vmap_curr.cols() * vmap_curr.rows() /3];
+
+                icp_perpixel_residual.download(&icpRes[0], icp_perpixel_residual.cols() * 4);
+
+                float noCorresp = 0;
+
+                for (int k=0; k< vmap_curr.cols() * vmap_curr.rows() /3; k++) {
+                    if (icpRes[k] == 0)
+                        noCorresp ++;
+                }
+
+                std::cout<<icp_perpixel_residual.rows()<<" "<<icp_perpixel_residual.cols()<<"\n";
+                std::cout<<"No corresp "<<noCorresp<<"\n";
+            }
+
+
 
             lastICPError = sqrt(residual[0]) / residual[1];
             lastICPCount = residual[1];

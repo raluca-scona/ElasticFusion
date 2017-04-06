@@ -198,6 +198,15 @@ void ElasticFusion::createTextures()
                                                       GL_LUMINANCE,
                                                       GL_FLOAT,
                                                       true);
+
+
+    textures[GPUTexture::DEPTH_NOCORR] = new GPUTexture(Resolution::getInstance().width(),
+                                                          Resolution::getInstance().height(),
+                                                          GL_LUMINANCE16UI_EXT,
+                                                          GL_LUMINANCE_INTEGER_EXT,
+                                                          GL_UNSIGNED_SHORT,
+                                                          false,
+                                                          true);
 }
 
 void ElasticFusion::createCompute()
@@ -207,6 +216,10 @@ void ElasticFusion::createCompute()
 
     computePacks[ComputePack::FILTER] = new ComputePack(loadProgramFromFile("empty.vert", "depth_bilateral.frag", "quad.geom"),
                                                         textures[GPUTexture::DEPTH_FILTERED]->texture);
+
+
+    computePacks[ComputePack::NOCORR] = new ComputePack(loadProgramFromFile("empty.vert", "depth_bilateral.frag", "quad.geom"),
+                                                        textures[GPUTexture::DEPTH_NOCORR]->texture);
 
     computePacks[ComputePack::METRIC] = new ComputePack(loadProgramFromFile("empty.vert", "depth_metric.frag", "quad.geom"),
                                                         textures[GPUTexture::DEPTH_METRIC]->texture);
@@ -604,6 +617,7 @@ void ElasticFusion::processFrame(const unsigned char * rgb,
                                          std::numeric_limits<unsigned short>::max());
             }
 
+            //not calling this does not allow the model to expand
             globalModel.clean(currPose,
                               tick,
                               indexMap.indexTex(),

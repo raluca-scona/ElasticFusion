@@ -32,7 +32,7 @@ class ComputePack
 
         virtual ~ComputePack();
 
-        static const std::string NORM, FILTER, METRIC, METRIC_FILTERED;
+        static const std::string NORM, FILTER, METRIC, METRIC_FILTERED, NOCORR;
 
         void compute(pangolin::GlTexture * input, const std::vector<Uniform> * const uniforms = 0);
 

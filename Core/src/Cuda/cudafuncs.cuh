@@ -77,6 +77,7 @@ void icpStep(const mat33& Rcurr,
              float * matrixA_host,
              float * vectorB_host,
              float * residual_host,
+             DeviceArray2D<float> & icp_perpixel_residual,
              int threads,
              int blocks);
 
@@ -127,6 +128,10 @@ void computeRgbResidual(const float & minScale,
 
 void createVMap(const CameraModel& intr,
                 const DeviceArray2D<unsigned short> & depth,
+                DeviceArray2D<float> & vmap,
+                const float depthCutoff);
+
+void createStatusMap(const DeviceArray2D<unsigned short> & depth,
                 DeviceArray2D<float> & vmap,
                 const float depthCutoff);
 

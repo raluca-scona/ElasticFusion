@@ -277,6 +277,7 @@ struct ICPReduction
     int rows;
     int N;
 
+    mutable PtrStep<float> icp_per_pixel_residual;
     JtJJtrSE3 * out;
 
     __device__ __forceinline__ bool
@@ -287,6 +288,8 @@ struct ICPReduction
         vcurr.y = vmap_curr.ptr (y + rows)[x];
         vcurr.z = vmap_curr.ptr (y + 2 * rows)[x];
 
+        icp_per_pixel_residual.ptr (y)[x] = 1; //assume found a correspondence
+
         float3 vcurr_g = Rcurr * vcurr + tcurr;
         float3 vcurr_cp = Rprev_inv * (vcurr_g - tprev);
 
@@ -294,8 +297,10 @@ struct ICPReduction
         ukr.x = __float2int_rn (vcurr_cp.x * intr.fx / vcurr_cp.z + intr.cx);
         ukr.y = __float2int_rn (vcurr_cp.y * intr.fy / vcurr_cp.z + intr.cy);
 
-        if(ukr.x < 0 || ukr.y < 0 || ukr.x >= cols || ukr.y >= rows || vcurr_cp.z < 0)
+        if(ukr.x < 0 || ukr.y < 0 || ukr.x >= cols || ukr.y >= rows || vcurr_cp.z < 0) {
+            icp_per_pixel_residual.ptr (y)[x] = -1; //invalid
             return false;
+        }
 
         float3 vprev_g;
         vprev_g.x = __ldg(&vmap_g_prev.ptr (ukr.y       )[ukr.x]);
@@ -321,7 +326,13 @@ struct ICPReduction
         d = vprev_g;
         s = vcurr_g;
 
-        return (sine < angleThres && dist <= distThres && !isnan (ncurr.x) && !isnan (nprev_g.x));
+        bool found_coresp = (sine < angleThres && dist <= distThres && !isnan (ncurr.x) && !isnan (nprev_g.x));
+
+        if (!found_coresp) {
+           icp_per_pixel_residual.ptr (y)[x] = 0; //no valid correspondence found - cound be a dynamic point
+        }
+
+        return found_coresp;
     }
 
     __device__ __forceinline__ JtJJtrSE3
@@ -431,6 +442,7 @@ void icpStep(const mat33& Rcurr,
              float * matrixA_host,
              float * vectorB_host,
              float * residual_host,
+             DeviceArray2D<float> & icp_perpixel_residual,
              int threads,
              int blocks)
 {
@@ -461,6 +473,8 @@ void icpStep(const mat33& Rcurr,
 
     icp.N = cols * rows;
     icp.out = sum;
+
+    icp.icp_per_pixel_residual = icp_perpixel_residual;
 
     icpKernel<<<blocks, threads>>>(icp);
 

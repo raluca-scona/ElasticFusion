@@ -131,6 +131,26 @@ __global__ void computeVmapKernel(const PtrStepSz<unsigned short> depth, PtrStep
     }
 }
 
+__global__ void computeStatusMapKernel(const PtrStepSz<unsigned short> depth, PtrStep<float> statusMap, float depthCutoff)
+{
+    int u = threadIdx.x + blockIdx.x * blockDim.x;
+    int v = threadIdx.y + blockIdx.y * blockDim.y;
+
+    if(u < depth.cols && v < depth.rows)
+    {
+        float z = depth.ptr (v)[u] / 1000.f; // load and convert: mm -> meters
+
+        if(z != 0 && z < depthCutoff)
+        {
+            statusMap.ptr (v                 )[u] = -1 ;
+        }
+        else
+        {
+            statusMap.ptr (v)[u] = 0; /*CUDART_NAN_F*/
+        }
+    }
+}
+
 void createVMap(const CameraModel& intr, const DeviceArray2D<unsigned short> & depth, DeviceArray2D<float> & vmap, const float depthCutoff)
 {
     vmap.create (depth.rows () * 3, depth.cols ());
@@ -146,6 +166,23 @@ void createVMap(const CameraModel& intr, const DeviceArray2D<unsigned short> & d
     computeVmapKernel<<<grid, block>>>(depth, vmap, 1.f / fx, 1.f / fy, cx, cy, depthCutoff);
     cudaSafeCall (cudaGetLastError ());
 }
+
+void createStatusMap(const DeviceArray2D<unsigned short> & depth, DeviceArray2D<float> & statusMap, const float depthCutoff)
+{
+    statusMap.create (depth.rows (), depth.cols ());
+
+    dim3 block (32, 8);
+    dim3 grid (1, 1, 1);
+    grid.x = getGridDim (depth.cols (), block.x);
+    grid.y = getGridDim (depth.rows (), block.y);
+
+
+    computeStatusMapKernel<<<grid, block>>>(depth, statusMap, depthCutoff);
+    cudaSafeCall (cudaGetLastError ());
+}
+
+
+
 
 __global__ void computeNmapKernel(int rows, int cols, const PtrStep<float> vmap, PtrStep<float> nmap)
 {

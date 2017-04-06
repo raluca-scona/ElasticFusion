@@ -22,6 +22,7 @@ const std::string ComputePack::NORM = "NORM";
 const std::string ComputePack::FILTER = "FILTER";
 const std::string ComputePack::METRIC = "METRIC";
 const std::string ComputePack::METRIC_FILTERED = "METRIC_FILTERED";
+const std::string ComputePack::NOCORR = "NOCORR";
 
 ComputePack::ComputePack(std::shared_ptr<Shader> program,
                          pangolin::GlTexture * target)

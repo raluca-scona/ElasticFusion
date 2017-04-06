@@ -94,7 +94,7 @@ void main()
                    
                    if(colorTime.w == time &&
                       vertConf.w > confThreshold && 
-                      vertConf.z > localPos.z && 
+                      vertConf.z > localPos.z &&
                       vertConf.z - localPos.z > 0.01 &&
                       abs(localNorm.z) > 0.85f)
                    {
@@ -105,7 +105,8 @@ void main()
         }
     }
     
-    if(count > 8 || zCount > 4)
+    //this part does the free space violation check - particularly, if zcount > 4
+    if(count > 8 || zCount > 4 ) // 4 )
     {
         test = 0;
     }
@@ -117,7 +118,7 @@ void main()
     }
     
     //Degenerate case or too unstable
-    if((vColor.w == -1 || ((time - vColor.w) > 20 && vPosition.w < confThreshold)))
+    if(vColor.w == -1 || ((time - vColor.w) > 20 && vPosition.w < confThreshold))
     {
         test = 0;
     }

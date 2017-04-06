@@ -85,6 +85,8 @@ class RGBDOdometry
         std::vector<DeviceArray2D<float> > vmaps_g_prev_;
         std::vector<DeviceArray2D<float> > nmaps_g_prev_;
 
+        std::vector<DeviceArray2D<float> > status_map;
+
         std::vector<DeviceArray2D<float> > vmaps_curr_;
         std::vector<DeviceArray2D<float> > nmaps_curr_;
 
