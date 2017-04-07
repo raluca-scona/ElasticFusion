@@ -42,7 +42,7 @@ class FeedbackBuffer
 
         void render(pangolin::OpenGlMatrix mvp, const Eigen::Matrix4f & pose, const bool drawNormals, const bool drawColors);
 
-        static const std::string RAW, FILTERED;
+        static const std::string RAW, FILTERED, NOCORR;
 
         GLuint vbo;
         GLuint fid;

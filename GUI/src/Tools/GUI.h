@@ -137,6 +137,7 @@ class GUI
 
             followPose = new pangolin::Var<bool>("ui.Follow pose", true, true);
             drawRawCloud = new pangolin::Var<bool>("ui.Draw raw", false, true);
+            drawNoCorrCloud = new pangolin::Var<bool>("ui.Draw No Corr Cloud", false, true);
             drawFilteredCloud = new pangolin::Var<bool>("ui.Draw filtered", false, true);
             drawGlobalModel = new pangolin::Var<bool>("ui.Draw global model", true, true);
             drawUnstable = new pangolin::Var<bool>("ui.Draw unstable points", false, true);
@@ -203,6 +204,8 @@ class GUI
             delete followPose;
             delete drawDeforms;
             delete drawRawCloud;
+            delete drawNoCorrCloud;
+            delete drawNormals;
             delete totalPoints;
             delete frameToFrameRGB;
             delete flipColors;
@@ -391,6 +394,7 @@ class GUI
                             * fastOdom,
                             * followPose,
                             * drawRawCloud,
+                            * drawNoCorrCloud,
                             * drawFilteredCloud,
                             * drawNormals,
                             * autoSettings,

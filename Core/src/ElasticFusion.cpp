@@ -172,6 +172,13 @@ void ElasticFusion::createTextures()
                                                      GL_LUMINANCE_INTEGER_EXT,
                                                      GL_UNSIGNED_SHORT);
 
+
+    textures[GPUTexture::DEPTH_NOCORR_RAW] = new GPUTexture(Resolution::getInstance().width(),
+                                                        Resolution::getInstance().height(),
+                                                        GL_LUMINANCE16UI_EXT,
+                                                        GL_LUMINANCE_INTEGER_EXT,
+                                                        GL_UNSIGNED_SHORT);
+
     textures[GPUTexture::DEPTH_FILTERED] = new GPUTexture(Resolution::getInstance().width(),
                                                           Resolution::getInstance().height(),
                                                           GL_LUMINANCE16UI_EXT,
@@ -186,6 +193,12 @@ void ElasticFusion::createTextures()
                                                         GL_LUMINANCE,
                                                         GL_FLOAT);
 
+    textures[GPUTexture::DEPTH_NOCORR_METRIC] = new GPUTexture(Resolution::getInstance().width(),
+                                                               Resolution::getInstance().height(),
+                                                               GL_LUMINANCE32F_ARB,
+                                                               GL_LUMINANCE,
+                                                               GL_FLOAT);
+
     textures[GPUTexture::DEPTH_METRIC_FILTERED] = new GPUTexture(Resolution::getInstance().width(),
                                                                  Resolution::getInstance().height(),
                                                                  GL_LUMINANCE32F_ARB,
@@ -199,14 +212,6 @@ void ElasticFusion::createTextures()
                                                       GL_FLOAT,
                                                       true);
 
-
-    textures[GPUTexture::DEPTH_NOCORR] = new GPUTexture(Resolution::getInstance().width(),
-                                                          Resolution::getInstance().height(),
-                                                          GL_LUMINANCE16UI_EXT,
-                                                          GL_LUMINANCE_INTEGER_EXT,
-                                                          GL_UNSIGNED_SHORT,
-                                                          false,
-                                                          true);
 }
 
 void ElasticFusion::createCompute()
@@ -218,20 +223,18 @@ void ElasticFusion::createCompute()
                                                         textures[GPUTexture::DEPTH_FILTERED]->texture);
 
 
-    computePacks[ComputePack::NOCORR] = new ComputePack(loadProgramFromFile("empty.vert", "depth_bilateral.frag", "quad.geom"),
-                                                        textures[GPUTexture::DEPTH_NOCORR]->texture);
+    computePacks[ComputePack::NOCORR] = new ComputePack(loadProgramFromFile("empty.vert", "depth_metric.frag", "quad.geom"), textures[GPUTexture::DEPTH_NOCORR_METRIC]->texture);
 
-    computePacks[ComputePack::METRIC] = new ComputePack(loadProgramFromFile("empty.vert", "depth_metric.frag", "quad.geom"),
-                                                        textures[GPUTexture::DEPTH_METRIC]->texture);
+    computePacks[ComputePack::METRIC] = new ComputePack(loadProgramFromFile("empty.vert", "depth_metric.frag", "quad.geom"), textures[GPUTexture::DEPTH_METRIC]->texture);
 
-    computePacks[ComputePack::METRIC_FILTERED] = new ComputePack(loadProgramFromFile("empty.vert", "depth_metric.frag", "quad.geom"),
-                                                                 textures[GPUTexture::DEPTH_METRIC_FILTERED]->texture);
+    computePacks[ComputePack::METRIC_FILTERED] = new ComputePack(loadProgramFromFile("empty.vert", "depth_metric.frag", "quad.geom"), textures[GPUTexture::DEPTH_METRIC_FILTERED]->texture);
 }
 
 void ElasticFusion::createFeedbackBuffers()
 {
     feedbackBuffers[FeedbackBuffer::RAW] = new FeedbackBuffer(loadProgramGeomFromFile("vertex_feedback.vert", "vertex_feedback.geom"));
     feedbackBuffers[FeedbackBuffer::FILTERED] = new FeedbackBuffer(loadProgramGeomFromFile("vertex_feedback.vert", "vertex_feedback.geom"));
+    feedbackBuffers[FeedbackBuffer::NOCORR] = new FeedbackBuffer(loadProgramGeomFromFile("vertex_feedback.vert", "vertex_feedback.geom"));
 }
 
 void ElasticFusion::computeFeedbackBuffers()
@@ -244,6 +247,11 @@ void ElasticFusion::computeFeedbackBuffers()
 
     feedbackBuffers[FeedbackBuffer::FILTERED]->compute(textures[GPUTexture::RGB]->texture,
                                                        textures[GPUTexture::DEPTH_METRIC_FILTERED]->texture,
+                                                       tick,
+                                                       maxDepthProcessed);
+
+    feedbackBuffers[FeedbackBuffer::NOCORR]->compute(textures[GPUTexture::RGB]->texture,
+                                                       textures[GPUTexture::DEPTH_NOCORR_METRIC]->texture,
                                                        tick,
                                                        maxDepthProcessed);
     TOCK("feedbackBuffers");
@@ -277,6 +285,8 @@ void ElasticFusion::processFrame(const unsigned char * rgb,
 
     textures[GPUTexture::DEPTH_RAW]->texture->Upload(depth, GL_LUMINANCE_INTEGER_EXT, GL_UNSIGNED_SHORT);
     textures[GPUTexture::RGB]->texture->Upload(rgb, GL_RGB, GL_UNSIGNED_BYTE);
+
+    //iterate through depth, only upload parts which are unstable. upload this as a texture
 
     TICK("Preprocess");
 
@@ -328,13 +338,32 @@ void ElasticFusion::processFrame(const unsigned char * rgb,
             Eigen::Matrix<float, 3, 3, Eigen::RowMajor> rot = currPose.topLeftCorner(3, 3);
 
             TICK("odom");
+            std::vector<float> icpResiduals (Resolution::getInstance().width() * Resolution::getInstance().height());
+
             frameToModel.getIncrementalTransformation(trans,
                                                       rot,
                                                       rgbOnly,
                                                       icpWeight,
                                                       pyramid,
                                                       fastOdom,
-                                                      so3);
+                                                      so3,
+                                                      icpResiduals);
+
+            unsigned short * pointsWithNoCorrespondence = new unsigned short [icpResiduals.size() *2 ];
+            memcpy ( pointsWithNoCorrespondence, depth, icpResiduals.size() *2);
+
+
+            for (unsigned int k=0; k<icpResiduals.size(); k++) {
+                //only show points with no correspondences
+
+                if (icpResiduals[k] != 0) {
+                    pointsWithNoCorrespondence[k] = 0;
+                }
+            }
+
+            textures[GPUTexture::DEPTH_NOCORR_RAW]->texture->Upload(pointsWithNoCorrespondence, GL_LUMINANCE_INTEGER_EXT, GL_UNSIGNED_SHORT);
+
+
             TOCK("odom");
 
             trackingOk = !reloc || frameToModel.lastICPError < 1e-04;
@@ -706,6 +735,7 @@ void ElasticFusion::metriciseDepth()
 
     computePacks[ComputePack::METRIC]->compute(textures[GPUTexture::DEPTH_RAW]->texture, &uniforms);
     computePacks[ComputePack::METRIC_FILTERED]->compute(textures[GPUTexture::DEPTH_FILTERED]->texture, &uniforms);
+    computePacks[ComputePack::NOCORR]->compute(textures[GPUTexture::DEPTH_NOCORR_RAW]->texture, &uniforms);
 }
 
 void ElasticFusion::filterDepth()

@@ -326,9 +326,9 @@ struct ICPReduction
         d = vprev_g;
         s = vcurr_g;
 
-        bool found_coresp = (sine < angleThres && dist <= distThres && !isnan (ncurr.x) && !isnan (nprev_g.x));
+        bool found_coresp = ( sine < angleThres && dist <= distThres && !isnan (ncurr.x) && !isnan (nprev_g.x));
 
-        if (!found_coresp) {
+        if (! (sine < angleThres && dist <= distThres) ) {
            icp_per_pixel_residual.ptr (y)[x] = 0; //no valid correspondence found - cound be a dynamic point
         }
 

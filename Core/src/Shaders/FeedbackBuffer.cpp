@@ -20,6 +20,8 @@
 
 const std::string FeedbackBuffer::RAW = "RAW";
 const std::string FeedbackBuffer::FILTERED = "FILTERED";
+const std::string FeedbackBuffer::NOCORR = "NOCORR";
+
 
 FeedbackBuffer::FeedbackBuffer(std::shared_ptr<Shader> program)
  : program(program),

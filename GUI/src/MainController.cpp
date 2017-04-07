@@ -335,14 +335,20 @@ void MainController::run()
 
         Eigen::Matrix4f pose = eFusion->getCurrPose();
 
-        if(gui->drawRawCloud->Get() || gui->drawFilteredCloud->Get())
+        if(gui->drawRawCloud->Get() || gui->drawFilteredCloud->Get() || gui->drawNoCorrCloud->Get())
         {
             eFusion->computeFeedbackBuffers();
         }
 
         if(gui->drawRawCloud->Get())
         {
-            eFusion->getFeedbackBuffers().at(FeedbackBuffer::RAW)->render(gui->s_cam.GetProjectionModelViewMatrix(), pose, gui->drawNormals->Get(), gui->drawColors->Get());
+           eFusion->getFeedbackBuffers().at(FeedbackBuffer::RAW)->render(gui->s_cam.GetProjectionModelViewMatrix(), pose, gui->drawNormals->Get(), gui->drawColors->Get());
+
+        }
+
+        if(gui->drawNoCorrCloud->Get())
+        {
+            eFusion->getFeedbackBuffers().at(FeedbackBuffer::NOCORR)->render(gui->s_cam.GetProjectionModelViewMatrix(), pose, gui->drawNormals->Get(), gui->drawColors->Get());
         }
 
         if(gui->drawFilteredCloud->Get())
