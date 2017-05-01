@@ -49,7 +49,8 @@ MainController::MainController(int argc, char * argv[])
 
     if(logFile.length())
     {
-        logReader = new RawLogReader(logFile, Parse::get().arg(argc, argv, "-f", empty) > -1);
+        // logReader = new RawLogReader(logFile, Parse::get().arg(argc, argv, "-f", empty) > -1);
+        logReader = new ImagesLogReader(logFile, Parse::get().arg(argc, argv, "-f", empty) > -1);
     }
     else
     {
@@ -229,7 +230,7 @@ void MainController::run()
 
                     if(logReader->rewound())
                     {
-                        logReader->currentFrame = 0;
+                       logReader->currentFrame = 0;
                     }
                 }
                 else

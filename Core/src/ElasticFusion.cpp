@@ -281,6 +281,7 @@ void ElasticFusion::processFrame(const unsigned char * rgb,
                                  const float weightMultiplier,
                                  const bool bootstrap)
 {
+
     TICK("Run");
 
     textures[GPUTexture::DEPTH_RAW]->texture->Upload(depth, GL_LUMINANCE_INTEGER_EXT, GL_UNSIGNED_SHORT);
@@ -315,6 +316,10 @@ void ElasticFusion::processFrame(const unsigned char * rgb,
             TICK("autoFill");
             resize.image(indexMap.imageTex(), imageBuff);
             bool shouldFillIn = !denseEnough(imageBuff);
+           // if(!denseEnough(imageBuff)) {
+           //     std::cout<<"NOT DENSE ENOUGH\n";
+           // }
+
             TOCK("autoFill");
 
             TICK("odomInit");
@@ -349,8 +354,8 @@ void ElasticFusion::processFrame(const unsigned char * rgb,
                                                       so3,
                                                       icpResiduals);
 
-            unsigned short * pointsWithNoCorrespondence = new unsigned short [icpResiduals.size() *2 ];
-            memcpy ( pointsWithNoCorrespondence, depth, icpResiduals.size() *2);
+            unsigned short * pointsWithNoCorrespondence = new unsigned short [ Resolution::getInstance().width() * Resolution::getInstance().height() *2 ];
+            memcpy ( pointsWithNoCorrespondence, depth, Resolution::getInstance().width() * Resolution::getInstance().height() *2);
 
 
             for (unsigned int k=0; k<icpResiduals.size(); k++) {
@@ -738,6 +743,7 @@ void ElasticFusion::metriciseDepth()
     computePacks[ComputePack::NOCORR]->compute(textures[GPUTexture::DEPTH_NOCORR_RAW]->texture, &uniforms);
 }
 
+
 void ElasticFusion::filterDepth()
 {
     std::vector<Uniform> uniforms;
@@ -761,7 +767,7 @@ void ElasticFusion::normaliseDepth(const float & minVal, const float & maxVal)
 
 void ElasticFusion::savePly()
 {
-    std::string filename = saveFilename;
+    std::string filename = "saveFilename";
     filename.append(".ply");
 
     // Open file

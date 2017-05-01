@@ -166,8 +166,7 @@ void RGBDOdometry::initICP(GPUTexture * predictedVertices, GPUTexture * predicte
     for(int i = 1; i < NUM_PYRS; ++i)
     {
         resizeVMap(vmaps_curr_[i - 1], vmaps_curr_[i]);
-        resizeNMap(vmaps_curr_[i - 1], vmaps_curr_[i]);
-    }
+        resizeNMap(nmaps_curr_[i - 1], nmaps_curr_[i]);    }
 
     cudaDeviceSynchronize();
 }
@@ -496,8 +495,8 @@ void RGBDOdometry::getIncrementalTransformation(Eigen::Vector3f & trans,
 
             float residual[2];
 
-            DeviceArray2D<float> icp_perpixel_residual;
-            icp_perpixel_residual.create(vmap_curr.rows() / 3, vmap_curr.cols());
+            DeviceArray2D<float> icp_no_model_correspondence;
+            icp_no_model_correspondence.create(vmap_curr.rows() / 3, vmap_curr.cols());
 
             if(icp)
             {
@@ -518,7 +517,7 @@ void RGBDOdometry::getIncrementalTransformation(Eigen::Vector3f & trans,
                         A_icp.data(),
                         b_icp.data(),
                         &residual[0],
-                        icp_perpixel_residual,
+                        icp_no_model_correspondence,
                         GPUConfig::getInstance().icpStepThreads,
                         GPUConfig::getInstance().icpStepBlocks);
                 TOCK("icpStep");
@@ -526,24 +525,16 @@ void RGBDOdometry::getIncrementalTransformation(Eigen::Vector3f & trans,
 
             //the last iteration on the finest scale
             if (j == iterations[i] - 1 && i == 0 && so3) {
-                float icpRes[ icp_perpixel_residual.rows() * icp_perpixel_residual.cols()];
+                float icpRes[ icp_no_model_correspondence.rows() * icp_no_model_correspondence.cols()];
 
                 //std::vector<float> icpResiduals (Resolution::getInstance().width() * Resolution::getInstance().height());
 
-                icp_perpixel_residual.download(&icpRes[0], icp_perpixel_residual.cols() * 4);
-
-                float noCorresp = 0;
-
-                for (int k=0; k<icp_perpixel_residual.rows() * icp_perpixel_residual.cols(); k++) {
-                    if (icpRes[k] == 0)
-                        noCorresp ++;
-                }
+                icp_no_model_correspondence.download(&icpRes[0], icp_no_model_correspondence.cols() * 4);
 
                 //std::copy(icpResiduals.begin(), icpResiduals.end(), icpRes.begin());
 
-                std::copy(icpRes, icpRes + icp_perpixel_residual.rows() * icp_perpixel_residual.cols(), icpResiduals.begin());
+                std::copy(icpRes, icpRes + icp_no_model_correspondence.rows() * icp_no_model_correspondence.cols(), icpResiduals.begin());
                // std::cout<<icp_perpixel_residual.rows()<<" "<<icp_perpixel_residual.cols()<<"\n"
-                std::cout<<"No corresp "<<noCorresp<<"\n";
             }
 
 
